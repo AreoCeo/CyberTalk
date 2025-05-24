@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Education Perfected | Learning, Assessment and Analytics Platform
+{% endblock %}
+
+{% block main %}
+<div class="d-flex flex-column justify-content-center align-items-center" style="min-height: 100vh;">
+    <div class="text-center mb-4 animated fadeIn">
+        <h1 class="display-4">What do you teach?</h1>
+        <h3 class="h5">Unlock every secondary student’s potential with differentiated learning at scale. </h3>
+        <h4 class="h6">English, Math, Chinese, and a whole range of subjects</h4>
+      
+        <div class="mt-4 d-flex flex-column align-items-center">
+            <a href="/register" class="btn btn-primary btn-lg mb-2">Request a trial</a>
+            <a href="/login" class="btn btn-secondary btn-lg">Sign in</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .animated {
+        animation-duration: 0.8s;
+        animation-fill-mode: both;
+    }
+    .fadeIn {
+        animation-name: fadeIn;
+    }
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+{% endblock %}

@@ -1,40 +1,188 @@
 {% extends "layout.html" %}
 
 {% block title %}
-    Education Perfected | Learning, Assessment and Analytics Platform
+    CyberTalk | Secure Group Chat
 {% endblock %}
 
 {% block main %}
-<div class="d-flex flex-column justify-content-center align-items-center" style="min-height: 100vh;">
-    <div class="text-center mb-4 animated fadeIn">
-        <h1 class="display-4">What do you teach?</h1>
-        <h3 class="h5">Unlock every secondary student’s potential with differentiated learning at scale. </h3>
-        <h4 class="h6">English, Math, Chinese, and a whole range of subjects</h4>
-      
-        <div class="mt-4 d-flex flex-column align-items-center">
-            <a href="/register" class="btn btn-primary btn-lg mb-2">Request a trial</a>
-            <a href="/login" class="btn btn-secondary btn-lg">Sign in</a>
+<div class="container d-flex flex-column justify-content-center align-items-center" style="min-height: 100vh;">
+    <div class="row w-100 justify-content-center align-items-center" style="gap: 1.5rem 0;">
+        <div class="col-12 col-md-10 col-lg-8 mb-4">
+            <div class="panel-glass panel-fadeIn text-center p-4 mb-3">
+                <h1 class="display-4 mb-3 neon-text">Welcome to <span class="cyber-glow">CyberTalk</span></h1>
+                <h2 class="h5 mb-2">Effortless, <span class="text-gradient">secure</span> group conversations for everyone.</h2>
+            </div>
+        </div>
+        <div class="col-12 col-md-5 col-lg-4 mb-4">
+            <div class="panel-glass panel-fadeIn p-4 h-100 d-flex flex-column align-items-center">
+                <h3 class="h6 mb-3 text-gradient">How does it work?</h3>
+                <ul class="list-unstyled mb-3 text-start w-100" style="margin-left: 0.5rem;">
+                    <li><b>Group Key:</b> Instantly access group chats with a key.</li>
+                    <li><b>Secure & Private:</b> End-to-end encryption, always.</li>
+                    <li><b>Fast & Simple:</b> No setup. Just join and chat.</li>
+                    <li><b>Cross-Device:</b> Use anywhere, on any device.</li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-12 col-md-5 col-lg-4 mb-4">
+            <div class="panel-glass panel-fadeIn p-4 h-100 d-flex flex-column align-items-center justify-content-center">
+                <h3 class="h6 mb-3 text-gradient">Get Started</h3>
+                <a href="/register" class="btn btn-primary btn-lg mb-2 futuristic-btn">Create Account</a>
+                <a href="/login" class="btn btn-secondary btn-lg futuristic-btn">Sign In</a>
+            </div>
         </div>
     </div>
 </div>
 
+<nav id="dynamic-inverted-navbar" class="navbar navbar-inverted fixed-bottom justify-content-center py-2">
+    <span>
+        By using CyberTalk you agree to our
+        <a href="/terms" target="_blank">terms of service</a>
+    </span>
+</nav>
+
 <style>
-    .animated {
-        animation-duration: 0.8s;
-        animation-fill-mode: both;
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(120deg, #f6f9fc 0%, #e9f1fa 100%);
+        color: #1b232b;
+        font-family: 'JetBrains Mono', 'Fira Mono', 'Consolas', monospace;
+        letter-spacing: 0.02em;
     }
-    .fadeIn {
-        animation-name: fadeIn;
+    .panel-glass {
+        background: rgba(255, 255, 255, 0.92);
+        border: 1.5px solid rgba(70, 180, 255, 0.11);
+        border-radius: 1.25rem;
+        box-shadow: 0 6px 24px 0 rgba(70,180,255,0.09), 0 1.5px 8px 0 rgba(80,180,255,0.07), 0 0 0 1.5px rgba(100,190,255,0.06) inset;
+        backdrop-filter: blur(7px) saturate(115%);
+        transition: box-shadow 0.4s;
+        position: relative;
+        
     }
-    @keyframes fadeIn {
+    .panel-glass:hover, .panel-glass:focus-within {
+        box-shadow: 0 0 26px 0 #1a9fff29, 0 1.5px 12px 0 #69bfff16, 0 0 0 2.5px #62e4ff11 inset;
+    }
+    .panel-fadeIn {
+        animation: panelFadeIn 0.9s cubic-bezier(0.22,1,0.36,1) both;
+    }
+    @keyframes panelFadeIn {
         from {
             opacity: 0;
-            transform: translateY(-20px);
+            filter: blur(2px);
+            transform: translateY(-35px) scale(0.98);
         }
         to {
             opacity: 1;
-            transform: translateY(0);
+            filter: blur(0);
+            transform: translateY(0) scale(1);
+        }
+    }
+    .neon-text {
+        color: #0077ff;
+        text-shadow:
+            0 0 5px #c5e9ff,
+            0 0 10px #b7e2ff,
+            0 0 20px #fff;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+    }
+    .cyber-glow {
+        color: #1dafff;
+        text-shadow:
+            0 0 6px #b6eaff, 
+            0 0 20px #c3f4ff99, 
+            0 0 28px #e4fcff55;
+    }
+    .text-gradient {
+        background: linear-gradient(90deg, #1dafff, #0077ff 55%, #3dcaff 90%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-fill-color: transparent;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+    }
+    .futuristic-btn {
+        font-family: inherit;
+        border-radius: 1.5rem;
+        border-width: 2px;
+        border-style: solid;
+        box-shadow: 0 0 8px #4fdcff22, 0 1.5px 8px #2ec7ff11;
+        letter-spacing: 0.08em;
+        transition: box-shadow 0.3s, border-color 0.3s, background 0.2s;
+    }
+    .btn-primary.futuristic-btn {
+        border-color: #00baff;
+        background: linear-gradient(90deg, #0077ff 0%, #00eaff 100%);
+        color: #fff;
+    }
+    .btn-primary.futuristic-btn:hover, .btn-primary.futuristic-btn:focus {
+        box-shadow: 0 0 16px #00eaff66, 0 2.5px 16px #00eaff33;
+        border-color: #72d8ff;
+        background: linear-gradient(90deg, #00eaff 0%, #0077ff 100%);
+        color: #fff;
+    }
+    .btn-secondary.futuristic-btn {
+        border-color: #ddeaff;
+        background: linear-gradient(90deg, #f7fbff 0%, #e9f1fa 100%);
+        color: #1b232b;
+    }
+    .btn-secondary.futuristic-btn:hover, .btn-secondary.futuristic-btn:focus {
+        border-color: #00eaff;
+        color: #0077ff;
+        background: linear-gradient(90deg, #eaf6ff 0%, #b9eaff 100%);
+        box-shadow: 0 0 16px #00eaff33, 0 2.5px 16px #00eaff11;
+    }
+    .navbar-inverted {
+        background: linear-gradient(90deg, #e9f1fa 0%, #f7fbfe 100%);
+        color: #1b232b;
+        box-shadow: 0 -2px 8px rgba(160,200,255,0.16);
+        border-top: 1px solid #ddeaff;
+        width: 100vw;
+        left: 0;
+        bottom: 0;
+        z-index: 1030;
+        position: fixed;
+        transition: background 0.5s;
+        font-family: 'JetBrains Mono', 'Fira Mono', 'Consolas', monospace;
+    }
+    .navbar-inverted a {
+        color: #0077ff;
+        text-decoration: underline;
+        transition: color 0.3s;
+    }
+    .navbar-inverted a:hover {
+        color: #1dafff;
+    }
+    @media (max-width: 576px) {
+        .navbar-inverted span {
+            font-size: 0.95em;
+        }
+        .display-4 {
+            font-size: 2.1rem;
+        }
+        .panel-glass {
+            padding: 1.25rem !important;
         }
     }
 </style>
+<script>
+    // Make navbar dynamic based on user activity (dimming on idle, restore on move)
+    let navbar = document.getElementById('dynamic-inverted-navbar');
+    let idleTimeout;
+    function setNavbarDim(dim) {
+        navbar.style.opacity = dim ? '0.45' : '1';
+        navbar.style.pointerEvents = dim ? 'none' : 'auto';
+    }
+    function resetNavbarIdle() {
+        setNavbarDim(false);
+        if (idleTimeout) clearTimeout(idleTimeout);
+        idleTimeout = setTimeout(() => setNavbarDim(true), 3500);
+    }
+    window.addEventListener('mousemove', resetNavbarIdle);
+    window.addEventListener('keydown', resetNavbarIdle);
+    setTimeout(() => setNavbarDim(true), 3500);
+</script>
 {% endblock %}

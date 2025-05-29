@@ -12,6 +12,12 @@ from werkzeug.utils import secure_filename
 import shutil as shutil
 from urllib.parse import unquote
 from flask import jsonify, request, redirect, url_for, flash, render_template
+import pickle
+from PIL import Image
+
+SETTINGS_DIR = "settings"
+os.makedirs(SETTINGS_DIR, exist_ok=True)
+os.makedirs(os.path.join("static", "profile_pics"), exist_ok=True)
 # Database setup
 db = SQL("sqlite:///logins.db")
 
@@ -40,6 +46,13 @@ def load_user(user_id):
         user_obj.emoji = user[0]['emoji']
         return user_obj
     return None
+
+@app.context_processor
+def inject_settings():
+    if current_user.is_authenticated:
+        user_settings = load_user_settings(current_user.id)
+        return dict(settings=user_settings)
+    return dict(settings=None)
 
 @app.after_request
 def after_request(response):
@@ -144,12 +157,19 @@ def get_messages(key):
         return jsonify({"messages": data.get(key, [])})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+import re
+def extract_mentions(text):
+    """Extract @mentions from a message string."""
+    # Matches @username or @everyone, usernames must be word chars or underscores
+    return set(re.findall(r'@(\w+|everyone)', text or ""))
 
 @app.route("/chat_room/<key>", methods=['POST'])
 @login_required
 def post_message(key):
+    import uuid
     message = request.json.get('message', '')
     image_url = request.json.get('image_url', None)
+    reply_to = request.json.get('reply_to', None)
 
     if not message and not image_url:
         return jsonify({"error": "Message cannot be empty."}), 400
@@ -161,26 +181,54 @@ def post_message(key):
         if key not in data:
             data[key] = []
 
+        user_settings = load_user_settings(current_user.id)
+        profile_pic = user_settings.get("profile_pic") or "default.png"
+        msg_id = str(uuid.uuid4())
+
+        # Detect mentions
+        mentions = extract_mentions(message)
+        mentioned_users = []
+        highlight = False
+
+        if "everyone" in mentions:
+            highlight = True
+            mentioned_users = [user['username'] for user in db.execute("SELECT username FROM users")]
+        else:
+            for username in mentions:
+                if username == current_user.username:
+                    continue
+                rows = db.execute("SELECT * FROM users WHERE username = ?", username)
+                if rows:
+                    mentioned_users.append(username)
+                    highlight = True
+
         msg_data = {
+            "id": msg_id,
             "username": current_user.username,
             "emoji": current_user.emoji,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat() + "Z",
+            "profile_pic": profile_pic,
+            "highlight": highlight,  # <<--- THIS IS USED IN THE FRONTEND
+            "mentions": mentioned_users,
         }
         if message:
             msg_data["message"] = message
         if image_url:
             msg_data["image_url"] = image_url
+        if reply_to:
+            msg_data["reply_to"] = reply_to
 
         data[key].append(msg_data)
 
         with open("messages.json", "w") as file:
             json.dump(data, file)
 
+        # Optionally: Trigger notifications here
         return jsonify({"success": True}), 200
     except Exception as e:
         print(f"Error posting message: {e}")
         return jsonify({"error": str(e)}), 500
-
+    
 @app.route("/delete_account", methods=["POST"])
 @login_required
 def delete_account():
@@ -387,6 +435,20 @@ def check_timeout():
         return jsonify({"timed_out": True})
     return jsonify({"timed_out": False})
 
+@app.route("/timeout-canceled")
+@login_required
+def timeout_canceled():
+    timeout_until = timeouts.get(current_user.username)
+    # If user is NOT in timeouts, their timeout has been canceled (or expired)
+    if not timeout_until:
+        return jsonify({"timeout_canceled": True})
+    # If timeout is still in effect, return False
+    if datetime.now() < datetime.strptime(timeout_until, "%Y-%m-%d %H:%M:%S"):
+        return jsonify({"timeout_canceled": False})
+    # Timeout expired, remove from dict and return True
+    del timeouts[current_user.username]
+    return jsonify({"timeout_canceled": True})
+
 @app.route("/cancel_timeout/<username>", methods=["POST"])
 @login_required
 def cancel_timeout(username):
@@ -415,6 +477,196 @@ def reset_messages():
     except Exception as e:
         flash(f"Error resetting messages: {str(e)}")
     return redirect(url_for("admin"))
+
+
+
+
+DEFAULT_SETTINGS = {
+    "profile_pic": None,
+    "theme": "light",
+    "notifications": True,
+    "panic_url": "",
+}
+
+def get_settings_path(user_id):
+    return os.path.join(SETTINGS_DIR, f"settings_{user_id}.pkl")
+
+def load_user_settings(user_id):
+    path = get_settings_path(user_id)
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            return pickle.load(f)
+    return DEFAULT_SETTINGS.copy()
+
+def save_user_settings(user_id, settings):
+    path = get_settings_path(user_id)
+    with open(path, "wb") as f:
+        pickle.dump(settings, f)
+
+@app.route("/settings", methods=["GET", "POST"])
+@login_required
+def settings():
+    settings = load_user_settings(current_user.id)
+    if request.method == "POST":
+        # Handle profile picture upload
+        if "profile_pic" in request.files and request.files["profile_pic"].filename:
+            file = request.files["profile_pic"]
+            # Remove old profile picture if it exists and isn't default.png
+            old_pic = settings.get("profile_pic")
+            if old_pic and old_pic != "default.png":
+                old_path = os.path.join("static", "profile_pics", old_pic)
+                if os.path.exists(old_path):
+                    try:
+                        os.remove(old_path)
+                    except Exception as e:
+                        print(f"Failed to remove old profile picture: {e}")
+            # Save new profile picture and resize it
+            filename = f"profile_{current_user.id}_{secure_filename(file.filename)}"
+            filepath = os.path.join("static", "profile_pics", filename)
+            file.save(filepath)
+            # Resize to 100x100 using Pillow
+            try:
+                with Image.open(filepath) as im:
+                    im = im.convert("RGBA") if im.mode in ("P", "RGBA") else im.convert("RGB")
+                    im = im.resize((100, 100), Image.LANCZOS)
+                    im.save(filepath)
+            except Exception as e:
+                print(f"Error resizing profile picture: {e}")
+            settings["profile_pic"] = filename
+
+        # Theme selection
+        if request.form.get("theme") in ["light", "dark", "yellow"]:
+            settings["theme"] = request.form.get("theme")
+        
+        # Notifications
+        settings["notifications"] = request.form.get("notifications") == "on"
+
+        # Panic URL
+        settings["panic_url"] = request.form.get("panic_url", "")
+
+        # Password change
+        new_password = request.form.get("new_password")
+        if new_password:
+            hashed_password = generate_password_hash(new_password)
+            db.execute("UPDATE users SET hash = ? WHERE id = ?", hashed_password, current_user.id)
+            flash("Password changed!")
+
+        # Save settings
+        save_user_settings(current_user.id, settings)
+
+        from flask import make_response
+        resp = make_response(redirect(url_for("settings")))
+        resp.set_cookie("notifications_enabled", "1" if settings["notifications"] else "0")
+        flash("Settings updated!")
+        return resp
+
+    return render_template("settings.html", settings=settings, user=current_user)
+
+@app.route("/delete_profile_pic/<username>", methods=["POST"])
+@login_required
+def delete_profile_pic(username):
+    # Only admin can do this
+    if current_user.username != "h":
+        return jsonify(success=False, error="Access denied"), 403
+
+    # Find user id by username
+    user_row = db.execute("SELECT id FROM users WHERE username = ?", username)
+    if not user_row:
+        return jsonify(success=False, error="User not found"), 404
+    user_id = user_row[0]["id"]
+
+    # Load settings
+    user_settings = load_user_settings(user_id)
+    old_pic = user_settings.get("profile_pic")
+    if old_pic and old_pic != "default.png":
+        old_path = os.path.join("static", "profile_pics", old_pic)
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except Exception as e:
+                print(f"Failed to remove profile picture: {e}")
+    user_settings["profile_pic"] = "default.png"
+    save_user_settings(user_id, user_settings)
+    return jsonify(success=True)
+
+
+from flask import jsonify, send_file
+
+@app.route('/path/messages.json')
+def serve_messages_json():
+    try:
+        # Option 1: Serve as application/json (recommended)
+        import json
+        with open('messages.json', 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+        # Option 2: To force a download, use:
+        # return send_file('messages.json', as_attachment=True)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+import os
+import json
+from flask import request, jsonify
+from flask_login import login_required, current_user
+from datetime import datetime, timezone
+
+TYPING_FILE = "typing.json"
+
+def load_typing_data():
+    if not os.path.exists(TYPING_FILE):
+        return {}
+    with open(TYPING_FILE, "r") as f:
+        return json.load(f)
+
+def save_typing_data(data):
+    with open(TYPING_FILE, "w") as f:
+        json.dump(data, f)
+
+@app.route('/typing/<key>', methods=['POST'])
+@login_required
+def typing(key):
+    username = current_user.username
+    now = datetime.now(timezone.utc).isoformat()
+    data = load_typing_data()
+    if key not in data:
+        data[key] = {}
+    data[key][username] = now
+    save_typing_data(data)
+    return jsonify(success=True)
+
+@app.route('/typing_stop/<key>', methods=['POST'])
+@login_required
+def typing_stop(key):
+    username = current_user.username
+    data = load_typing_data()
+    if key in data and username in data[key]:
+        del data[key][username]
+        save_typing_data(data)
+    return jsonify(success=True)
+
+@app.route('/typing_status/<key>')
+@login_required
+def typing_status(key):
+    now = datetime.now(timezone.utc)
+    data = load_typing_data()
+    active_typers = []
+    changed = False
+    if key in data:
+        for username, last_time_str in list(data[key].items()):
+            last_time = datetime.fromisoformat(last_time_str)
+            if (now - last_time).total_seconds() > 3:
+                del data[key][username]
+                changed = True
+            else:
+                active_typers.append(username)
+        if changed:
+            save_typing_data(data)
+    return jsonify(typing=active_typers)
+
+@app.route('/terms')
+def terms_and_conditions():
+    return render_template('policy.html')
 
 if __name__ == "__main__":
     # Ensure IMAGES directory exists

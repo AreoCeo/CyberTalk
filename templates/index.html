@@ -1,39 +1,74 @@
 {% extends "layout.html" %}
 
 {% block title %}
-    Log In
+    CyberTalk – Main
 {% endblock %}
 
 {% block main %}
-<div class="d-flex flex-column justify-content-center align-items-center" style="min-height: 100vh;">
-    <div class="text-center mb-4 animated fadeIn">
-        <h1 class="display-4">You are logged in</h1>
-        <h2 class="h3">Welcome to Education Perfected!</h2>
-        <p>Welcome to this totally not sus website </p>
-        <p>that we made, this is totally actual EP.</p>
-        <h3 class="h5">Key Features:</h3>
-        <ul class="list-unstyled">
-            <li><b>Acurate learning:</b> Create an account and start learning in seconds(definitley acually learning).</li>
-            <li><b>Secureness</b> Your data is protected with secure password hashing.</li>
-            <li><b>Support for homeless:</b> Do you only have 2 IQ like fraser? We can fix that by whooping your aaa.</li>
-            <li><b>Responsive Design:</b> The website looks cool.</li>
-            <li><b>PANIC MODE ❗❗❗:</b> ON SOMETHING ELSE INSTEAD OF CLASS WORK? </li> 👀
-                     Just put in what your SUPPOSED TO DO IN CLASS </li>
-                     AND PRESS 'End' ON KEYBOARD TO EVADE THE AUTHORITIES</li>
-        </ul>
+<div class="container d-flex flex-column justify-content-center align-items-center" style="min-height: 100vh;">
+    <div class="row w-100 justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6 mb-4">
+            <div class="card shadow animated fadeIn">
+                <div class="card-body text-center">
+                    <h1 class="display-5 mb-3">Welcome to CyberTalk</h1>
+                    <p class="lead">Secure, simple group chats for everyone.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-8 col-lg-6 mb-4">
+            <div class="card shadow animated fadeIn" style="animation-delay: 0.1s;">
+                <div class="card-body">
+                    <h4 class="card-title">How it works</h4>
+                    <p class="card-text mb-0">
+                        Join or create a chat by sharing a group key. All conversations are secure and private.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-8 col-lg-6 mb-4">
+            <div class="card shadow animated fadeIn" style="animation-delay: 0.2s;">
+                <div class="card-body">
+                    <h4 class="card-title">Key Features</h4>
+                    <ul class="list-unstyled mb-0">
+                        <li><b>Easy Group Access:</b> Share a group key to join or invite others.</li>
+                        <li><b>Secure:</b> End-to-end encrypted conversations for your privacy.</li>
+                        <li><b>Fast:</b> No setup needed. Just enter your key and start talking.</li>
+                        <li><b>Responsive:</b> Works on all devices, anywhere.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-8 col-lg-6 mb-4">
+            <div class="card shadow animated fadeIn" style="animation-delay: 0.3s;">
+                <div class="card-body">
+                    <h4 class="card-title">Get Started</h4>
+                    <p class="card-text mb-0">
+                        Enter your group key above to join a chat, or create a new group to begin a secure conversation.
+                    </p>
+                </div>
+            </div>
+        </div>
     </div>
-
-    <form action="/delete_account" method="POST" onsubmit="return confirm('Are you sure you want to delete your account? This action cannot be undone.');" class="text-center animated fadeIn">
-        <button type="submit" class="btn btn-danger btn-lg">Delete Account</button>
-    </form>
-    <form id="panicUrlForm" class="text-center animated fadeIn">
-        <label for="panicUrl">Enter a panic redirect URL:</label>
-        <input type="text" id="panicUrl" name="panicUrl" class="form-control mt-2" placeholder="https://example.com">
-    </form>
-    
 </div>
 
+<nav id="dynamic-inverted-navbar" class="navbar navbar-inverted fixed-bottom justify-content-center py-2">
+    <span>
+        By using CyberTalk you agree to our
+        <a href="/terms" target="_blank">terms of service</a>
+    </span>
+</nav>
+
 <style>
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* Disable scrolling */
+    }
+    body > .container {
+        height: 100vh;
+        overflow: hidden;
+    }
     .animated {
         animation-duration: 0.8s;
         animation-fill-mode: both;
@@ -48,8 +83,52 @@
         }
         to {
             opacity: 1;
-            transform: translateY(0);
+        }
+    }
+    .navbar-inverted {
+        background: linear-gradient(90deg, #222 0%, #333 100%);
+        color: #fff;
+        box-shadow: 0 -2px 8px rgba(0,0,0,0.25);
+        border-top: 1px solid #444;
+        width: 100vw;
+        left: 0;
+        bottom: 0;
+        z-index: 1030;
+        position: fixed;
+        transition: background 0.5s;
+    }
+    .navbar-inverted a {
+        color: #80bdff;
+        text-decoration: underline;
+        transition: color 0.3s;
+    }
+    .navbar-inverted a:hover {
+        color: #f8f9fa;
+    }
+    @media (max-width: 576px) {
+        .navbar-inverted span {
+            font-size: 0.95em;
+        }
+        .display-5 {
+            font-size: 2.1rem;
         }
     }
 </style>
+<script>
+    // Make navbar dynamic based on user activity (dimming on idle, restore on move)
+    let navbar = document.getElementById('dynamic-inverted-navbar');
+    let idleTimeout;
+    function setNavbarDim(dim) {
+        navbar.style.opacity = dim ? '0.45' : '1';
+        navbar.style.pointerEvents = dim ? 'none' : 'auto';
+    }
+    function resetNavbarIdle() {
+        setNavbarDim(false);
+        if (idleTimeout) clearTimeout(idleTimeout);
+        idleTimeout = setTimeout(() => setNavbarDim(true), 3500);
+    }
+    window.addEventListener('mousemove', resetNavbarIdle);
+    window.addEventListener('keydown', resetNavbarIdle);
+    setTimeout(() => setNavbarDim(true), 3500);
+</script>
 {% endblock %}

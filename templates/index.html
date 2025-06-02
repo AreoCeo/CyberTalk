@@ -1,60 +1,32 @@
 {% extends "layout.html" %}
 
 {% block title %}
-    Main
+    Log In
 {% endblock %}
 
 {% block main %}
-<div class="container d-flex flex-column justify-content-center align-items-center" style="min-height: 100vh;">
-    <div class="row w-100 justify-content-center">
-        <div class="col-12 col-md-8 col-lg-6 mb-4">
-            <div class="card shadow animated fadeIn">
-                <div class="card-body text-center">
-                    <h1 class="display-5 mb-3">Welcome to CyberTalk</h1>
-                    <p class="lead">Secure, simple group chats for everyone.</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-md-8 col-lg-6 mb-4">
-            <div class="card shadow animated fadeIn" style="animation-delay: 0.1s;">
-                <div class="card-body">
-                    <h4 class="card-title">How it works</h4>
-                    <p class="card-text mb-0">
-                        Join or create a chat by sharing a group key. All conversations are secure and private.
-                    </p>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-md-8 col-lg-6 mb-4">
-            <div class="card shadow animated fadeIn" style="animation-delay: 0.2s;">
-                <div class="card-body">
-                    <h4 class="card-title">Key Features</h4>
-                    <ul class="list-unstyled mb-0">
-                        <li><b>Easy Group Access:</b> Share a group key to join or invite others.</li>
-                        <li><b>Secure:</b> End-to-end encrypted conversations for your privacy.</li>
-                        <li><b>Fast:</b> No setup needed. Just enter your key and start talking.</li>
-                        <li><b>Responsive:</b> Works on all devices, anywhere.</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-md-8 col-lg-6 mb-4">
-            <div class="card shadow animated fadeIn" style="animation-delay: 0.3s;">
-                <div class="card-body">
-                    <h4 class="card-title">Get Started</h4>
-                    <p class="card-text mb-0">
-                        Enter your group key above to join a chat, or create a new group to begin a secure conversation.
-                    </p>
-                </div>
-            </div>
-        </div>
+<div class="d-flex flex-column justify-content-center align-items-center" style="min-height: 100vh;">
+    <div class="text-center mb-4 animated fadeIn">
+        <h1 class="display-4">You are logged in</h1>
+        <h2 class="h3">Welcome to Our Messaging App!</h2>
+        <p>This application is designed to facilitate seamless communication between users. With features like</p>
+        <p>group chats and personalized messaging, it aims to enhance your online interaction experience.</p>
+        <h3 class="h5">Key Features:</h3>
+        <ul class="list-unstyled">
+            <li><b>User Registration:</b> Create an account and start messaging in seconds.</li>
+            <li><b>Secure Login:</b> Your data is protected with secure password hashing.</li>
+            <li><b>Group Chats:</b> Join or create groups to chat with friends or colleagues.</li>
+            <li><b>Responsive Design:</b> The app is mobile-friendly, making it easy to communicate on the go.</li>
+        </ul>
     </div>
+
 </div>
 
+<!-- Real inverted sticky/dynamic footer navbar -->
 <nav id="dynamic-inverted-navbar" class="navbar navbar-inverted fixed-bottom justify-content-center py-2">
     <span>
-        By using CyberTalk you agree to our
-        <a href="/terms" target="_blank">terms of service</a>
+        By using Education Perfected you are agreeing to the 
+        <a href="/terms" target="_blank">terms</a>
     </span>
 </nav>
 
@@ -65,7 +37,7 @@
         padding: 0;
         overflow: hidden; /* Disable scrolling */
     }
-    body > .container {
+    body > .d-flex {
         height: 100vh;
         overflow: hidden;
     }
@@ -83,6 +55,7 @@
         }
         to {
             opacity: 1;
+            transform: translateY(0);
         }
     }
     .navbar-inverted {
@@ -109,9 +82,6 @@
         .navbar-inverted span {
             font-size: 0.95em;
         }
-        .display-5 {
-            font-size: 2.1rem;
-        }
     }
 </style>
 <script>
@@ -129,6 +99,7 @@
     }
     window.addEventListener('mousemove', resetNavbarIdle);
     window.addEventListener('keydown', resetNavbarIdle);
+    // Start dimming after initial load
     setTimeout(() => setNavbarDim(true), 3500);
 </script>
 {% endblock %}

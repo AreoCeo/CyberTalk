@@ -3,8 +3,18 @@
 
 {% block main %}
 <div class="container chat-container">
-    <div class="d-flex justify-content-between align-items-center" style="padding: 1rem;">
-        <h3 class="mb-0">Group Code: {{ key }}</h3>
+    <div class="container chat-container">
+        <div class="d-flex justify-content-between align-items-center" style="padding: 1rem;">
+            <h3 class="mb-0">Group Code: {{ key }}</h3>
+        </div>
+    
+    <div id="voiceChatPanel" style="display:none; background:#181c22; padding:10px; border-radius:10px; margin-bottom:8px;">
+        <div>
+            <b>Voice Chat:</b> <span id="voiceStatus">Connecting...</span>
+            <button class="btn btn-sm btn-danger" onclick="leaveVoiceChat()" style="margin-left:12px;">Leave Call</button>
+        </div>
+        <div id="voiceUsers" style="margin-top:6px; color:#fff; font-size:14px;"></div>
+        <div id="voiceAudioElements"></div>
     </div>
     <div class="chat-window" style="position: relative; flex: 1 1 0; display: flex; flex-direction: column; min-height: 0;">
         <!-- Reply bar -->
@@ -259,6 +269,147 @@ select:focus {
 
 <script>
 // Luxon for time zone formatting
+const key = "{{ key }}";
+const currentUser = "{{ current_user.username }}";
+
+// === VOICE CHAT LOGIC ===
+let socket = null;
+let localStream = null;
+let peerConnections = {};
+let inVoice = false;
+let voiceJoinedUsers = new Set();
+
+function toggleVoiceChat() {
+    if (!inVoice) {
+        joinVoiceChat();
+    } else {
+        leaveVoiceChat();
+    }
+}
+
+function joinVoiceChat() {
+    if (inVoice) return;
+    inVoice = true;
+    document.getElementById('voiceChatPanel').style.display = '';
+    document.getElementById('voiceBtnLabel').textContent = "In Voice";
+    document.getElementById('joinVoiceBtn').classList.add("btn-success");
+    document.getElementById('voiceStatus').textContent = "Connecting...";
+    // Connect socket
+    if (!socket) {
+        socket = io({ transports: ['websocket'] });
+        setupVoiceSocket();
+    }
+    socket.emit('join-voice', {room: key, username: currentUser});
+    // Get user media
+    navigator.mediaDevices.getUserMedia({audio: true}).then(stream => {
+        localStream = stream;
+        document.getElementById('voiceStatus').textContent = "In Call";
+        updateVoiceUsers();
+    }).catch(err => {
+        document.getElementById('voiceStatus').textContent = "Microphone denied";
+    });
+}
+
+function leaveVoiceChat() {
+    if (!inVoice) return;
+    inVoice = false;
+    document.getElementById('voiceChatPanel').style.display = 'none';
+    document.getElementById('voiceBtnLabel').textContent = "Join Voice Call";
+    document.getElementById('joinVoiceBtn').classList.remove("btn-success");
+    document.getElementById('voiceStatus').textContent = "Not in call";
+    // Close connections
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    for (let user in peerConnections) {
+        peerConnections[user].close();
+    }
+    peerConnections = {};
+    document.getElementById('voiceAudioElements').innerHTML = "";
+    if (socket) socket.emit('leave-voice', {room: key, username: currentUser});
+}
+
+function setupVoiceSocket() {
+    socket.on('voice-users', data => {
+        // List of usernames in call
+        voiceJoinedUsers = new Set(data.users || []);
+        updateVoiceUsers();
+    });
+    socket.on('voice-signal', async data => {
+        // WebRTC signaling
+        const from = data.username;
+        if (from === currentUser) return;
+        let pc = peerConnections[from];
+        if (!pc) {
+            pc = createVoicePeerConnection(from);
+            peerConnections[from] = pc;
+        }
+        if (data.signal.sdp) {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.signal.sdp));
+            if (data.signal.sdp.type === "offer") {
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                socket.emit('voice-signal', {room: key, signal: {sdp: pc.localDescription}, username: currentUser, target: from});
+            }
+        }
+        if (data.signal.candidate) {
+            await pc.addIceCandidate(new RTCIceCandidate(data.signal.candidate));
+        }
+    });
+    socket.on('voice-leave', data => {
+        const user = data.username;
+        if (peerConnections[user]) {
+            peerConnections[user].close();
+            delete peerConnections[user];
+        }
+        const audioElem = document.getElementById('audio-' + user);
+        if (audioElem) audioElem.remove();
+        voiceJoinedUsers.delete(user);
+        updateVoiceUsers();
+    });
+}
+
+function createVoicePeerConnection(remoteUser) {
+    const pc = new RTCPeerConnection();
+    // Add local audio
+    if (localStream) localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    pc.onicecandidate = event => {
+        if (event.candidate) {
+            socket.emit('voice-signal', {room: key, signal: {candidate: event.candidate}, username: currentUser, target: remoteUser});
+        }
+    };
+    pc.ontrack = event => {
+        let audio = document.getElementById('audio-' + remoteUser);
+        if (!audio) {
+            audio = document.createElement('audio');
+            audio.id = 'audio-' + remoteUser;
+            audio.autoplay = true;
+            audio.controls = false;
+            document.getElementById('voiceAudioElements').appendChild(audio);
+        }
+        audio.srcObject = event.streams[0];
+    };
+    // Initial call for new users
+    if (currentUser < remoteUser) { // Deterministic offerer
+        pc.onnegotiationneeded = async () => {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socket.emit('voice-signal', {room: key, signal: {sdp: pc.localDescription}, username: currentUser, target: remoteUser});
+        };
+    }
+    return pc;
+}
+
+function updateVoiceUsers() {
+    const node = document.getElementById('voiceUsers');
+    if (!voiceJoinedUsers.size) {
+        node.textContent = "No one is in the call.";
+    } else {
+        let list = Array.from(voiceJoinedUsers).map(u => u === currentUser ? `<b>${u} (You)</b>` : u);
+        node.innerHTML = "In call: " + list.join(", ");
+    }
+}
 function setChatHeight() {
     const navbar = document.getElementById('main-navbar');
     if (navbar) {

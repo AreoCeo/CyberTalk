@@ -19,7 +19,6 @@ import io
 import zipfile
 import os
 import mimetypes
-
 SETTINGS_DIR = "settings"
 os.makedirs(SETTINGS_DIR, exist_ok=True)
 os.makedirs(os.path.join("static", "profile_pics"), exist_ok=True)
@@ -797,44 +796,9 @@ def files_view_image(req_path):
     return send_file(abs_path)
 
 
-from flask_socketio import SocketIO, emit, join_room, leave_room
-
-socketio = SocketIO(app, async_mode="threading", manage_session=False)
-
-voice_users = {}  # room_key -> set(usernames)
-
-@socketio.on('join-voice')
-def handle_join_voice(data):
-    room = data['room']
-    username = data['username']
-    join_room(room)
-    if room not in voice_users:
-        voice_users[room] = set()
-    voice_users[room].add(username)
-    emit('voice-users', {'users': list(voice_users[room])}, room=room)
-
-@socketio.on('leave-voice')
-def handle_leave_voice(data):
-    room = data['room']
-    username = data['username']
-    leave_room(room)
-    if room in voice_users and username in voice_users[room]:
-        voice_users[room].remove(username)
-    emit('voice-leave', {'username': username}, room=room)
-    emit('voice-users', {'users': list(voice_users.get(room, []))}, room=room)
-
-@socketio.on('voice-signal')
-def handle_voice_signal(data):
-    room = data['room']
-    target = data.get('target')
-    # Send signal only to the intended target,
-    # or to all others in room if no target specified
-    if target:
-        emit('voice-signal', data, room=room, include_self=False)
-    else:
-        emit('voice-signal', data, room=room, include_self=False)
 
 if __name__ == "__main__":
+    # Ensure IMAGES directory exists
     if not os.path.exists(UPLOAD_BASE):
         os.makedirs(UPLOAD_BASE)
-    socketio.run(app,  debug=True)
+    app.run(debug=True)

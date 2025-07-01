@@ -19,6 +19,7 @@ import io
 import zipfile
 import os
 import mimetypes
+import time
 SETTINGS_DIR = "settings"
 os.makedirs(SETTINGS_DIR, exist_ok=True)
 os.makedirs(os.path.join("static", "profile_pics"), exist_ok=True)
@@ -160,7 +161,8 @@ def get_messages(key):
             data = json.load(file)
         return jsonify({"messages": data.get(key, [])})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+
+        return render_template("error2.html", message=f"error: {str(e)}")
 import re
 def extract_mentions(text):
     """Extract @mentions from a message string."""
@@ -176,7 +178,7 @@ def post_message(key):
     reply_to = request.json.get('reply_to', None)
 
     if not message and not image_url:
-        return jsonify({"error": "Message cannot be empty."}), 400
+        return render_template("error2.html", message="Message cannot be empty."), 400
 
     try:
         with open("messages.json", "r") as file:
@@ -231,7 +233,7 @@ def post_message(key):
         return jsonify({"success": True}), 200
     except Exception as e:
         print(f"Error posting message: {e}")
-        return jsonify({"error": str(e)}), 500
+        return render_template("error2.html", message=f"Error posting message: {str(e)}"), 500
     
 @app.route("/delete_account", methods=["POST"])
 @login_required
@@ -264,7 +266,8 @@ def chat():
 def delete_chat(chat_id):
     if current_user.username != "h":
         flash("Access denied: Admin privileges required.")
-        return redirect("/admin")
+        return redirect("/")
+    
 
     db.execute("DELETE FROM group_chats WHERE id = ?", chat_id)
     flash(f"Group chat '{chat_id}' has been deleted.")
@@ -284,7 +287,7 @@ def get_directory_size(path):
 def admin():
     if current_user.username != "h":
         flash("Access denied: Admin privileges required.")
-        return redirect("/")
+        return render_template("error2.html", message="Access denied: Admin privileges required.")
 
     users = db.execute("SELECT username, hash FROM users")
     group_chats = db.execute("SELECT id FROM group_chats")
@@ -340,7 +343,7 @@ def delete_images_folder(key):
 @login_required
 def delete_images_folders():
     if current_user.username != "h":
-        return jsonify(success=False, error="Access denied"), 403
+        return render_template("error2.html", message="Access denied: Admin privileges required."), 403
     data = request.get_json()
     keys = data.get('keys', [])
     images_base = os.path.join(os.getcwd(), "IMAGES")
@@ -368,7 +371,8 @@ def delete_image(key, filename):
 @login_required
 def delete_images():
     if current_user.username != "h":
-        return jsonify(success=False, error="Access denied"), 403
+
+        return render_template("error2.html", message="Access denied: Admin privileges required."), 403
     data = request.get_json()
     images = data.get('images', [])
     images_base = os.path.join(os.getcwd(), "IMAGES")
@@ -385,7 +389,8 @@ def delete_images():
 def delete_user(username):
     if current_user.username != "h":
         flash("Access denied: Admin privileges required.")
-        return redirect("/admin")
+
+        return render_template("error2.html", message="Access denied: Admin privileges required."), 403
 
     db.execute("DELETE FROM users WHERE username = ?", username)
     flash(f"User '{username}' has been deleted.")
@@ -411,10 +416,10 @@ def delete_file_later(path, seconds=300):
 @login_required
 def upload_image(key):
     if 'image' not in request.files:
-        return jsonify({"error": "No file part"}), 400
+        return render_template("error2.html", message="No file part"), 400
     file = request.files['image']
     if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+        return render_template("error2.html", message="No file selected"), 400
 
     filename = secure_filename(file.filename)
     group_path = os.path.join(UPLOAD_BASE, str(key))
@@ -441,9 +446,8 @@ timeouts = {}
 @app.route("/mod", methods=["GET", "POST"])
 @login_required
 def mod_panel():
-    if current_user.username.strip() not in ["h", "Diimi", "bu", "ct"]:
-        flash("Access denied: Moderator privileges required.")
-        return redirect(url_for("index"))
+    if current_user.username.strip() not in ["h", "Diimi", "bu", "ct", "sanna"]:
+        return render_template("error2.html", message="Access denied: Moderator privileges required."), 403
 
     if request.method == "POST":
         username = request.form.get("username")
@@ -510,7 +514,8 @@ def reset_messages():
             json.dump({}, file)
         flash("All messages have been reset.")
     except Exception as e:
-        flash(f"Error resetting messages: {str(e)}")
+        
+        return render_template("error2.html", message=f"Error resetting messages: {str(e)}")
     return redirect(url_for("admin"))
 
 
@@ -566,7 +571,8 @@ def settings():
                     im = im.resize((100, 100), Image.LANCZOS)
                     im.save(filepath)
             except Exception as e:
-                print(f"Error resizing profile picture: {e}")
+
+                return render_template("error2.html", message=f"Error resizing profile picture: {str(e)}")
             settings["profile_pic"] = filename
 
         # Theme selection
@@ -602,12 +608,13 @@ def settings():
 def delete_profile_pic(username):
     # Only admin can do this
     if current_user.username != "h":
-        return jsonify(success=False, error="Access denied"), 403
+        
+        return render_template("error2.html", message="Access denied: Admin privileges required."), 403
 
     # Find user id by username
     user_row = db.execute("SELECT id FROM users WHERE username = ?", username)
     if not user_row:
-        return jsonify(success=False, error="User not found"), 404
+        return render_template("error2.html", message="User not found"), 404
     user_id = user_row[0]["id"]
 
     # Load settings

@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Error
+{% endblock %}
+
+{% block main %}
+<div class="container text-center mt-5">
+    <h1 class="display-4">Oops</h1>
+    
+    <p class="lead">{{ message }}</p>
+    <a class="btn btn-primary" href="/">Back to home</a>
+    <a class="btn btn-secondary" href="/logout">Log out</a>
+</div>
+{% endblock %}

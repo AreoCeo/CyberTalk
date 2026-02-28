@@ -62,7 +62,6 @@
 html, body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; }
 .chat-header { padding:0.5rem 1rem; flex-shrink: 0; }
 .chat-container {
-    /* CHANGED: Use 100dvh for mobile support */
     height: calc(100dvh - var(--navbar-height, 56px) - 12px);
     display:flex; flex-direction:column; padding:0; margin:0; max-width:100vw;
     padding-left:10px; padding-right:10px;
@@ -73,7 +72,6 @@ html, body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; }
     padding:15px; border-radius:10px; background:#23272a;
     display:flex; flex-direction:column; gap:10px;
 }
-/* Ensure input row doesn't shrink on mobile keyboards */
 .input-row { 
     margin-top:0 !important; 
     padding:6px 0 2px 0; 
@@ -106,13 +104,11 @@ button:focus, input:focus, textarea:focus, select:focus { outline:none !importan
 .typing-dot { display:inline-block; width:6px; height:6px; margin-right:2px; border-radius:50%; background:#b9bbbe; opacity:0.45; animation:typing-bounce 1.2s infinite both; }
 .typing-dot:nth-child(1){animation-delay:0s}.typing-dot:nth-child(2){animation-delay:0.2s}.typing-dot:nth-child(3){animation-delay:0.4s}
 @keyframes typing-bounce { 0%,80%,100%{opacity:0.45;transform:translateY(0)} 40%{opacity:1;transform:translateY(-3px)} }
-/* Context menu */
 .ctx-item { padding:9px 16px; color:#dcddde; font-size:14px; cursor:pointer; display:flex; align-items:center; gap:10px; transition:background 0.1s; }
 .ctx-item:hover { background:#404249; }
 .ctx-danger { color:#ed4245 !important; }
 .ctx-danger:hover { background:rgba(237,66,69,0.12) !important; }
 .ctx-divider { border-top:1px solid #3f4147; margin:4px 0; }
-/* Mobile */
 @media (max-width:600px) {
     .chat-container { padding:0 !important; }
     .message-box { padding:6px; }
@@ -186,7 +182,6 @@ document.getElementById('ctxForward').addEventListener('click', () => {
     hideCtxMenu();
 });
 
-// Rebuild messages (used after delete)
 function rebuildMessages() {
     messagesContainer.innerHTML = '';
     renderedMessageIds = new Set();
@@ -236,6 +231,7 @@ function hideReplyBar() {
 document.getElementById('cancelReplyBtn').addEventListener('click', hideReplyBar);
 
 // --- TYPING ---
+// Reduced polling: typing status every 2.5s instead of 1s
 const typingIndicator = document.getElementById('typingIndicator');
 let typing = false, typingTimeout = null, typingUsers = [];
 function sendTypingEvent() {
@@ -243,7 +239,11 @@ function sendTypingEvent() {
     if (typingTimeout) clearTimeout(typingTimeout);
     typingTimeout = setTimeout(stopTyping, 2500);
 }
-function stopTyping() { typing = false; fetch(`/typing_stop/${key}`, {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); }
+function stopTyping() {
+    if (!typing) return;
+    typing = false;
+    fetch(`/typing_stop/${key}`, {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+}
 function fetchTypingUsers() {
     fetch(`/typing_status/${key}`).then(r=>r.json()).then(data=>{
         typingUsers = data.typing||[];
@@ -251,12 +251,14 @@ function fetchTypingUsers() {
         if (!others.length) { typingIndicator.innerHTML=''; return; }
         const names = others.length===1?`${others[0]} is typing`:others.length===2?`${others[0]} and ${others[1]} are typing`:`${others[0]} and ${others.length-1} more are typing`;
         typingIndicator.innerHTML = `<span>${names}</span><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>`;
-    });
+    }).catch(()=>{});
 }
 const messageInput = document.getElementById('messageInput');
 messageInput.addEventListener('input', () => messageInput.value ? sendTypingEvent() : stopTyping());
 messageInput.addEventListener('blur', stopTyping);
-setInterval(fetchTypingUsers, 1000);
+
+// Poll typing every 2500ms instead of 1000ms
+setInterval(fetchTypingUsers, 2500);
 window.addEventListener('beforeunload', () => { stopTyping(); });
 
 // --- MESSAGES ---
@@ -285,9 +287,7 @@ function appendNewMessages(messages, forceScrollBottom=false) {
         if (isSent) row.classList.add('sent');
         row.dataset.msgId = message.id;
 
-        // Desktop right-click
         row.addEventListener('contextmenu', e => { e.preventDefault(); showCtxMenu(e.clientX, e.clientY, message); });
-        // Mobile long-press
         row.addEventListener('touchstart', e => {
             longPressTimer = setTimeout(() => {
                 const t = e.touches[0];
@@ -363,9 +363,12 @@ function formatSydneyTime(utcTimestamp) {
 }
 
 function fetchMessages(forceScrollBottom=false) {
-    fetch(`/messages/${key}`).then(r=>r.json()).then(data=>{ if(data.messages) appendNewMessages(data.messages,forceScrollBottom); });
+    fetch(`/messages/${key}`).then(r=>r.json()).then(data=>{ if(data.messages) appendNewMessages(data.messages,forceScrollBottom); }).catch(()=>{});
 }
-messagesContainer.innerHTML=''; fetchMessages(true); setInterval(fetchMessages, 3000);
+messagesContainer.innerHTML=''; fetchMessages(true);
+
+// Poll messages every 4s instead of 3s
+setInterval(fetchMessages, 4000);
 
 document.getElementById('sendMessageForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -406,9 +409,10 @@ function closeFullscreenImage() {
 }
 document.getElementById('fullscreenImageModal').addEventListener('click', function(e){ if(e.target===this) closeFullscreenImage(); });
 
+// Check timeout every 15s instead of 3s
 setInterval(()=>{
     fetch('/check_timeout').then(r=>r.json()).then(d=>{ if(d.timed_out) window.location.href='/chat'; }).catch(()=>{});
-}, 3000);
+}, 15000);
 
 document.addEventListener('DOMContentLoaded', ()=>{
     if ("Notification" in window && Notification.permission!=="granted" && Notification.permission!=="denied") Notification.requestPermission();

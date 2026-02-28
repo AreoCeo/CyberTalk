@@ -84,8 +84,6 @@
 </div>
 
 <style>
-/* --- THEME SYSTEM (Targeting body or layout) --- */
-/* Default/Dark */
 [data-theme="dark"] .dm-layout,
 .dm-layout {
     --bg-side: #2b2d31;
@@ -120,19 +118,16 @@
     --accent: #e65100;
 }
 
-/* --- LAYOUT --- */
 html, body { height:100%; margin:0; overflow:hidden; }
 
 .dm-layout { 
     display:flex; 
-    /* CHANGED: Use 100dvh for mobile support */
     height: calc(100dvh - var(--navbar-height,56px)); 
     background: var(--bg-chat);
     color: var(--text-main);
     transition: background 0.2s ease;
 }
 
-/* Sidebar Drawer */
 .dm-sidebar { 
     width:260px; 
     background: var(--bg-side); 
@@ -163,7 +158,6 @@ html, body { height:100%; margin:0; overflow:hidden; }
 .dm-new-area { padding:12px; border-top:1px solid var(--border); flex-shrink: 0; }
 .dm-new-input { background: var(--bg-input) !important; color: var(--text-main) !important; border: none; }
 
-/* Chat Area */
 .dm-chat-area { flex:1; display:flex; flex-direction:column; min-width:0; background: var(--bg-chat); position: relative; }
 .dm-chat-header { 
     padding:12px 16px; border-bottom:1px solid var(--border); 
@@ -176,7 +170,6 @@ html, body { height:100%; margin:0; overflow:hidden; }
     color: var(--text-main); font-size: 1.5rem; padding: 0;
 }
 
-/* Message box takes remaining space */
 .dm-message-box { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
 
 .dm-reply-bar { 
@@ -186,22 +179,19 @@ html, body { height:100%; margin:0; overflow:hidden; }
 }
 .dm-reply-close { position:absolute; right:10px; top:4px; background:none; border:none; color: var(--text-muted); font-size:20px; }
 
-/* Input row stays fixed at bottom via flex layout */
 .dm-input-row { 
     padding:12px 20px; 
     background: var(--bg-chat); 
-    flex-shrink: 0; /* Important for mobile */
-    padding-bottom: max(12px, env(safe-area-inset-bottom)); /* iOS Safe Area */
+    flex-shrink: 0;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 .dm-input-row .form-control { background: var(--bg-input); color: var(--text-main); border: none; height: 44px; }
 
-/* Messages */
 .discord-message { display:flex; gap:14px; padding:4px 0; }
 .discord-username { font-weight: 600; color: var(--accent); margin-right: 8px; }
 .discord-timestamp { font-size: 0.75rem; color: var(--text-muted); }
 .discord-content { color: var(--text-main); font-size: 0.95rem; margin-top: 2px; }
 
-/* Mobile Logic */
 @media (max-width: 768px) {
     .dm-sidebar {
         position: fixed; left: 0; top: var(--navbar-height, 56px); bottom: 0;
@@ -213,7 +203,6 @@ html, body { height:100%; margin:0; overflow:hidden; }
     .start-page-toggle { position: absolute; top: 15px; left: 15px; }
 }
 
-/* Context Menu */
 .dm-context-menu {
     display:none; position:fixed; z-index:9999; background: var(--bg-side); 
     border:1px solid var(--border); border-radius:8px; padding:6px 0; min-width:180px; box-shadow:0 8px 24px rgba(0,0,0,0.3);
@@ -229,7 +218,6 @@ const activeUser = "{{ active_user or '' }}";
 let dmRenderedIds = new Set();
 let dmReplyTo = null;
 
-// Mobile Sidebar Toggle
 function toggleSidebar(show) {
     const sidebar = document.getElementById('dmSidebar');
     if (show) {
@@ -246,12 +234,10 @@ function toggleSidebar(show) {
     }
 }
 
-// Close sidebar on mobile when clicking a user
 document.querySelectorAll('.dm-user-btn').forEach(btn => {
     btn.addEventListener('click', () => { if(window.innerWidth <= 768) toggleSidebar(false); });
 });
 
-// Context Menu Logic
 const dmCtxMenu = document.getElementById('dmCtxMenu');
 let dmCtxTarget = null;
 
@@ -284,7 +270,6 @@ document.getElementById('dmCtxDelete').onclick = () => {
     }
 };
 
-// Reply Logic
 function showDmReply(msg) {
     dmReplyTo = msg;
     document.getElementById('dmReplyBar').style.display = 'block';
@@ -297,7 +282,6 @@ function hideDmReply() {
     document.getElementById('dmReplyBar').style.display = 'none';
 }
 
-// --- SYDNEY TIME CONVERTER (Added for DM) ---
 function formatSydneyTime(utcTimestamp) {
     if (!utcTimestamp) return '';
     try {
@@ -307,11 +291,10 @@ function formatSydneyTime(utcTimestamp) {
         const t = dt.toFormat('hh:mm:ss a');
         return dt.hasSame(now,'day') ? `Today at ${t} ${dt.offsetNameShort}` : `${dt.toFormat('yyyy-MM-dd')} ${t} ${dt.offsetNameShort}`;
     } catch(e) {
-        return utcTimestamp; // Fallback
+        return utcTimestamp;
     }
 }
 
-// Messaging Logic
 const dmMessages = document.getElementById('dmMessages');
 
 function appendDmMessages(messages) {
@@ -326,7 +309,6 @@ function appendDmMessages(messages) {
         row.className = 'discord-message';
         row.oncontextmenu = (e) => { e.preventDefault(); showDmCtxMenu(e.clientX, e.clientY, msg); };
 
-        // Use formatSydneyTime here
         row.innerHTML = `
             <img src="/static/profile_pics/${msg.profile_pic || 'default.png'}" class="dm-user-avatar" onerror="this.src='/static/profile_pics/default.png'">
             <div class="discord-bubble">
@@ -335,7 +317,7 @@ function appendDmMessages(messages) {
                     <span class="discord-timestamp">${formatSydneyTime(msg.timestamp)}</span>
                 </div>
                 ${msg.reply_to ? `<div style="font-size:0.8rem; opacity:0.6; border-left:2px solid gray; padding-left:8px; margin-bottom:4px;">Replying to ${msg.reply_to.username}</div>` : ''}
-                <div class="discord-content">${msg.message}</div>
+                <div class="discord-content">${msg.message || ''}</div>
             </div>
         `;
         dmMessages.appendChild(row);
@@ -348,7 +330,7 @@ function fetchDmMessages() {
     if (!activeUser) return;
     fetch(`/dm_messages/${activeUser}`).then(r => r.json()).then(d => {
         if (d.messages) appendDmMessages(d.messages);
-    });
+    }).catch(()=>{});
 }
 
 const dmSendForm = document.getElementById('dmSendForm');
@@ -377,7 +359,8 @@ if (dmSendForm) {
 
 if (activeUser) {
     fetchDmMessages();
-    setInterval(fetchDmMessages, 3000);
+    // Poll DMs every 4s instead of 3s
+    setInterval(fetchDmMessages, 4000);
 }
 
 function startNewDm() {
@@ -385,7 +368,6 @@ function startNewDm() {
     if(val) window.location.href = `/dm/${val}`;
 }
 
-// Adjust layout height for navbars
 function setHeight() {
     const nav = document.querySelector('.navbar');
     if (nav) document.documentElement.style.setProperty('--navbar-height', nav.offsetHeight + 'px');

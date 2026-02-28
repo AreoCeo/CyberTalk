@@ -18,12 +18,11 @@ from werkzeug.utils import secure_filename
 from urllib.parse import unquote
 import shutil
 from PIL import Image
-from flask_login import logout_user # Add this to your imports
+from flask_login import logout_user
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user
 import warnings
-
-# Add this at the top of your app.py to ignore the Flask-Login warning
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="flask_login")
+
 SETTINGS_DIR = "settings"
 os.makedirs(SETTINGS_DIR, exist_ok=True)
 os.makedirs(os.path.join("static", "profile_pics"), exist_ok=True)
@@ -31,22 +30,62 @@ os.makedirs(os.path.join("static", "profile_pics"), exist_ok=True)
 db = SQL("sqlite:///logins.db")
 
 app = Flask(__name__)
-app.secret_key = "REPLACE_THIS_WITH_A_LONG_RANDOM_SECRET_KEY_12345"  # Change this!
+app.secret_key = "REPLACE_THIS_WITH_A_LONG_RANDOM_SECRET_KEY_12345"
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
+
+# --- FILE LOCKING UTILITIES ---
+
+_file_locks = {}
+_file_locks_mutex = threading.Lock()
+
+def get_file_lock(filepath):
+    with _file_locks_mutex:
+        if filepath not in _file_locks:
+            _file_locks[filepath] = threading.Lock()
+        return _file_locks[filepath]
+
+def read_json_file(filepath):
+    """Thread-safe JSON file read."""
+    lock = get_file_lock(filepath)
+    with lock:
+        try:
+            if not os.path.exists(filepath):
+                return {}
+            with open(filepath, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
+
+def write_json_file(filepath, data):
+    """Thread-safe JSON file write using atomic write."""
+    lock = get_file_lock(filepath)
+    with lock:
+        tmp_path = filepath + ".tmp"
+        try:
+            with open(tmp_path, "w") as f:
+                json.dump(data, f)
+            os.replace(tmp_path, filepath)
+        except Exception as e:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except:
+                    pass
+            raise e
+
+# --- USER ---
 
 class User(UserMixin):
     pass
 
 @login_manager.user_loader
 def load_user(user_id):
-    # Ensure user_id is treated as an int if your DB uses int IDs
     user = db.execute("SELECT * FROM users WHERE id = ?", user_id)
     if not user:
-        return None  # This is crucial!
-    
+        return None
     u = User()
     u.id = user[0]['id']
     u.username = user[0]['username']
@@ -62,7 +101,6 @@ def inject_settings():
 @app.after_request
 def after_request(response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    ...
     response.headers["Expires"] = 0
     response.headers["Pragma"] = "no-cache"
     return response
@@ -113,10 +151,6 @@ def login():
         return redirect("/")
     return render_template("login.html")
 
-
-# Make sure logout_user is imported at the top!
-from flask_login import logout_user 
-
 @app.route("/logout")
 @login_required
 def logout():
@@ -132,6 +166,7 @@ def index():
         return render_template("index.html")
     return render_template("home1.html")
 
+
 # --- GENERATE ---
 
 @app.route("/generate", methods=['GET', 'POST'])
@@ -146,14 +181,16 @@ def generate():
         return render_template("generate.html", key=h)
     return render_template("generate.html")
 
+
 # --- CHAT ---
+
+MESSAGES_FILE = "messages.json"
 
 @app.route("/messages/<key>")
 @login_required
 def get_messages(key):
     try:
-        with open("messages.json", "r") as f:
-            data = json.load(f)
+        data = read_json_file(MESSAGES_FILE)
         return jsonify({"messages": data.get(str(key), [])})
     except Exception as e:
         return render_template("error2.html", message=f"error: {str(e)}")
@@ -170,8 +207,7 @@ def post_message(key):
     if not message and not image_url:
         return jsonify({"error": "Message cannot be empty."}), 400
     try:
-        with open("messages.json", "r") as f:
-            data = json.load(f)
+        data = read_json_file(MESSAGES_FILE)
         if str(key) not in data:
             data[str(key)] = []
         user_settings = load_user_settings(current_user.id)
@@ -207,8 +243,7 @@ def post_message(key):
         if reply_to:
             msg_data["reply_to"] = reply_to
         data[str(key)].append(msg_data)
-        with open("messages.json", "w") as f:
-            json.dump(data, f)
+        write_json_file(MESSAGES_FILE, data)
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -217,13 +252,11 @@ def post_message(key):
 @login_required
 def delete_message(key, msg_id):
     try:
-        with open("messages.json", "r") as f:
-            data = json.load(f)
+        data = read_json_file(MESSAGES_FILE)
         key = str(key)
         if key in data:
             data[key] = [m for m in data[key] if not (m.get("id") == msg_id and m.get("username") == current_user.username)]
-        with open("messages.json", "w") as f:
-            json.dump(data, f)
+        write_json_file(MESSAGES_FILE, data)
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -232,14 +265,12 @@ def delete_message(key, msg_id):
 @login_required
 def chat():
     timeout_until = timeouts.get(current_user.username)
-    if timeout_until and datetime.now() < datetime.strptime(timeout_until, "%Y-%m-%d %H:%M:%S"):
+    if timeout_until and datetime.now(timezone.utc).replace(tzinfo=None) < datetime.strptime(timeout_until, "%Y-%m-%d %H:%M:%S"):
         return render_template("timeout.html", timeout_until=timeout_until)
 
-    # Get groups the user has participated in
     recent_groups = []
     try:
-        with open("messages.json", "r") as f:
-            data = json.load(f)
+        data = read_json_file(MESSAGES_FILE)
         for group_id, messages in data.items():
             for msg in messages:
                 if msg.get("username") == current_user.username:
@@ -260,35 +291,29 @@ def chat():
 @app.route("/chat_room/<key>", methods=['GET'])
 @login_required
 def chat_room_get(key):
-    """Allow direct navigation to a chat room (e.g., from generate page or admin Join button)."""
     chat_group = db.execute("SELECT * FROM group_chats WHERE id = ?", str(key))
     if not chat_group:
         return render_template("error2.html", message="Invalid group code.")
     return render_template("chat_room.html", key=key)
 
-# --- GET USERS (for DM forward modal) ---
 @app.route("/get_users")
 @login_required
 def get_users():
     users = db.execute("SELECT username FROM users")
     return jsonify({"users": [u['username'] for u in users]})
 
+
 # --- DIRECT MESSAGES ---
 
 DM_FILE = "dms.json"
 
 def load_dms():
-    if not os.path.exists(DM_FILE):
-        return {}
-    with open(DM_FILE, "r") as f:
-        return json.load(f)
+    return read_json_file(DM_FILE)
 
 def save_dms(data):
-    with open(DM_FILE, "w") as f:
-        json.dump(data, f)
+    write_json_file(DM_FILE, data)
 
 def get_dm_key(user1, user2):
-    """Consistent key for a DM conversation regardless of order."""
     return "__dm__" + "__".join(sorted([user1, user2]))
 
 @app.route("/dm")
@@ -322,7 +347,6 @@ def dm_list():
 @app.route("/dm/<username>")
 @login_required
 def dm_chat(username):
-    # Check user exists
     user_row = db.execute("SELECT * FROM users WHERE username = ?", username)
     if not user_row and username != current_user.username:
         return render_template("error2.html", message="User not found.")
@@ -346,7 +370,6 @@ def dm_chat(username):
             profile_pic = s.get("profile_pic") or "default.png"
         conversations.append({"username": other_username, "profile_pic": profile_pic, "unread": 0})
 
-    # Also include current user if not already in conversations
     if not any(c["username"] == username for c in conversations) and username != current_user.username:
         row = db.execute("SELECT id FROM users WHERE username = ?", username)
         pp = "default.png"
@@ -355,7 +378,6 @@ def dm_chat(username):
             pp = s.get("profile_pic") or "default.png"
         conversations.insert(0, {"username": username, "profile_pic": pp, "unread": 0})
 
-    # Active user profile pic
     active_pp = "default.png"
     row = db.execute("SELECT id FROM users WHERE username = ?", username)
     if row:
@@ -383,7 +405,6 @@ def send_dm():
         return jsonify({"error": "No recipient specified"}), 400
     if not message and not image_url:
         return jsonify({"error": "Empty message"}), 400
-    # Check user exists
     user_row = db.execute("SELECT id FROM users WHERE username = ?", to_user)
     if not user_row:
         return jsonify({"error": "User not found"}), 404
@@ -430,6 +451,7 @@ def admin_reset_dms():
     save_dms({})
     return jsonify({"success": True})
 
+
 # --- CUSTOM GROUP CODE (Admin only) ---
 
 @app.route("/create_custom_group", methods=['POST'])
@@ -447,6 +469,7 @@ def create_custom_group():
         return jsonify({"error": f"Group '{code}' already exists."}), 409
     db.execute("INSERT INTO group_chats (id, custom) VALUES (?, 1)", code)
     return jsonify({"success": True, "code": code})
+
 
 # --- ADMIN ---
 
@@ -496,7 +519,6 @@ def admin():
     root_size_gb = root_size / (1024 ** 3)
     percent_used = min(100, root_size_gb * 100)
 
-    # DM stats
     dm_stats = None
     try:
         dms = load_dms()
@@ -585,19 +607,24 @@ def delete_chats():
         db.execute("DELETE FROM group_chats WHERE id = ?", c)
     return jsonify(success=True)
 
+
 # --- IMAGE UPLOAD ---
 UPLOAD_BASE = os.path.join(os.getcwd(), "IMAGES")
 
 def delete_file_later(path, seconds=300):
+    """Use a single daemon thread instead of threading.Timer to avoid memory leaks."""
     def remove():
+        time.sleep(seconds)
         try:
-            os.remove(path)
+            if os.path.exists(path):
+                os.remove(path)
             group_folder = os.path.dirname(path)
-            if not os.listdir(group_folder):
+            if os.path.isdir(group_folder) and not os.listdir(group_folder):
                 os.rmdir(group_folder)
         except Exception as e:
             print(f"Failed to delete {path}: {e}")
-    threading.Timer(seconds, remove).start()
+    t = threading.Thread(target=remove, daemon=True)
+    t.start()
 
 @app.route("/IMAGES/<key>/", methods=["POST"])
 @login_required
@@ -619,6 +646,7 @@ def upload_image(key):
 def serve_image(key, filename):
     return send_from_directory(os.path.join(UPLOAD_BASE, str(key)), filename)
 
+
 # --- TIMEOUTS ---
 timeouts = {}
 
@@ -633,18 +661,29 @@ def mod_panel():
         if duration < 1 or duration > 60:
             flash("Invalid timeout duration!")
             return redirect(url_for("mod_panel"))
-        timeouts[username] = (datetime.now() + timedelta(minutes=duration)).strftime("%Y-%m-%d %H:%M:%S")
+        timeouts[username] = (datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=duration)).strftime("%Y-%m-%d %H:%M:%S")
         flash(f"User {username} timed out for {duration} minutes.")
         return redirect(url_for("mod_panel"))
     users = [{"username": u["username"]} for u in db.execute("SELECT username FROM users")]
     return render_template("mod.html", users=users, timeouts=timeouts)
 
-@app.route("/check_timeout")
-@login_required
+@app.before_request
+def update_last_active():
+    session['last_active'] = datetime.now(timezone.utc).isoformat()
+
+@app.route('/check_timeout')
 def check_timeout():
-    timeout_until = timeouts.get(current_user.username)
-    if timeout_until and datetime.now() < datetime.strptime(timeout_until, "%Y-%m-%d %H:%M:%S"):
-        return jsonify({"timed_out": True})
+    if current_user.is_authenticated:
+        last_active_str = session.get('last_active')
+        if last_active_str:
+            try:
+                last_active = datetime.fromisoformat(last_active_str)
+                now = datetime.now(timezone.utc)
+                if now - last_active > timedelta(minutes=30):
+                    logout_user()
+                    return jsonify({"timed_out": True})
+            except Exception:
+                pass
     return jsonify({"timed_out": False})
 
 @app.route("/timeout-canceled")
@@ -653,7 +692,7 @@ def timeout_canceled():
     timeout_until = timeouts.get(current_user.username)
     if not timeout_until:
         return jsonify({"timeout_canceled": True})
-    if datetime.now() < datetime.strptime(timeout_until, "%Y-%m-%d %H:%M:%S"):
+    if datetime.now(timezone.utc).replace(tzinfo=None) < datetime.strptime(timeout_until, "%Y-%m-%d %H:%M:%S"):
         return jsonify({"timeout_canceled": False})
     del timeouts[current_user.username]
     return jsonify({"timeout_canceled": True})
@@ -674,12 +713,12 @@ def reset_messages():
     if current_user.username != "h":
         return redirect("/admin")
     try:
-        with open("messages.json", "w") as f:
-            json.dump({}, f)
+        write_json_file(MESSAGES_FILE, {})
         flash("All messages reset.")
     except Exception as e:
         return render_template("error2.html", message=str(e))
     return redirect(url_for("admin"))
+
 
 # --- SETTINGS ---
 DEFAULT_SETTINGS = {"profile_pic": None, "theme": "light", "notifications": True, "panic_url": ""}
@@ -687,16 +726,26 @@ DEFAULT_SETTINGS = {"profile_pic": None, "theme": "light", "notifications": True
 def get_settings_path(user_id):
     return os.path.join(SETTINGS_DIR, f"settings_{user_id}.pkl")
 
+_settings_lock = threading.Lock()
+
 def load_user_settings(user_id):
     path = get_settings_path(user_id)
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            return pickle.load(f)
+    with _settings_lock:
+        if os.path.exists(path):
+            try:
+                with open(path, "rb") as f:
+                    return pickle.load(f)
+            except Exception:
+                pass
     return DEFAULT_SETTINGS.copy()
 
 def save_user_settings(user_id, settings):
-    with open(get_settings_path(user_id), "wb") as f:
-        pickle.dump(settings, f)
+    path = get_settings_path(user_id)
+    tmp_path = path + ".tmp"
+    with _settings_lock:
+        with open(tmp_path, "wb") as f:
+            pickle.dump(settings, f)
+        os.replace(tmp_path, path)
 
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
@@ -781,60 +830,54 @@ def delete_all_profile_pics():
         save_user_settings(u["id"], us)
     return jsonify(success=True)
 
+
 # --- TYPING ---
-TYPING_FILE = "typing.json"
-
-def load_typing_data():
-    if not os.path.exists(TYPING_FILE):
-        return {}
-    with open(TYPING_FILE, "r") as f:
-        return json.load(f)
-
-def save_typing_data(data):
-    with open(TYPING_FILE, "w") as f:
-        json.dump(data, f)
+# Keep typing data in memory instead of a file to reduce I/O
+_typing_data = {}
+_typing_lock = threading.Lock()
 
 @app.route('/typing/<key>', methods=['POST'])
 @login_required
 def typing(key):
-    data = load_typing_data()
-    if key not in data:
-        data[key] = {}
-    data[key][current_user.username] = datetime.now(timezone.utc).isoformat()
-    save_typing_data(data)
+    with _typing_lock:
+        if key not in _typing_data:
+            _typing_data[key] = {}
+        _typing_data[key][current_user.username] = datetime.now(timezone.utc).isoformat()
     return jsonify(success=True)
 
 @app.route('/typing_stop/<key>', methods=['POST'])
 @login_required
 def typing_stop(key):
-    data = load_typing_data()
-    if key in data and current_user.username in data[key]:
-        del data[key][current_user.username]
-        save_typing_data(data)
+    with _typing_lock:
+        if key in _typing_data and current_user.username in _typing_data[key]:
+            del _typing_data[key][current_user.username]
     return jsonify(success=True)
 
 @app.route('/typing_status/<key>')
 @login_required
 def typing_status(key):
     now = datetime.now(timezone.utc)
-    data = load_typing_data()
     active = []
-    changed = False
-    if key in data:
-        for username, last_time_str in list(data[key].items()):
-            last_time = datetime.fromisoformat(last_time_str)
-            if (now - last_time).total_seconds() > 3:
-                del data[key][username]
-                changed = True
-            else:
-                active.append(username)
-        if changed:
-            save_typing_data(data)
+    with _typing_lock:
+        if key in _typing_data:
+            expired = []
+            for username, last_time_str in _typing_data[key].items():
+                try:
+                    last_time = datetime.fromisoformat(last_time_str)
+                    if (now - last_time).total_seconds() > 3:
+                        expired.append(username)
+                    else:
+                        active.append(username)
+                except Exception:
+                    expired.append(username)
+            for u in expired:
+                del _typing_data[key][u]
     return jsonify(typing=active)
 
 @app.route('/terms')
 def terms_and_conditions():
     return render_template('policy.html')
+
 
 # --- FILE EXPLORER ---
 def is_path_safe(base, target):
@@ -921,9 +964,8 @@ def files_view_image(req_path):
 if __name__ == "__main__":
     if not os.path.exists(UPLOAD_BASE):
         os.makedirs(UPLOAD_BASE)
-    # Ensure group_chats table has 'custom' column
     try:
         db.execute("ALTER TABLE group_chats ADD COLUMN custom INTEGER DEFAULT 0")
     except Exception:
-        pass  # Column already exists
+        pass
     app.run(debug=True)

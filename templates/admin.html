@@ -68,7 +68,7 @@
     <!-- Create Custom Group Code -->
     <div class="card p-3 shadow-sm mb-4" style="border-left:4px solid #5865F2;">
         <h3 class="fw-semibold mb-1"><i class="bi bi-key-fill" style="color:#5865F2;"></i> Create Custom Group Code</h3>
-        <p class="text-muted mb-3" style="font-size:13px;">Admin-only: create a group with a memorable custom code (e.g. <code>announcements</code>, <code>general</code>).</p>
+        <p class="text-muted mb-3" style="font-size:13px;">Admin-only: create a group with a memorable custom code.</p>
         <form id="customGroupForm" class="d-flex gap-2 flex-wrap">
             <input type="text" id="customGroupCode" class="form-control" placeholder="Enter custom code..." style="max-width:260px;" required minlength="2" maxlength="50">
             <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Create Group</button>
@@ -138,10 +138,10 @@
 
     <!-- Image Management -->
     <div class="card p-3 shadow-sm mb-4">
-        <h3 class="fw-semibold mb-2">Image Management</h3>
+        <h3 class="fw-semibold mb-2"><i class="bi bi-images"></i> Image Management</h3>
         <button id="deleteSelectedImageFolders" class="btn btn-danger d-none mb-2">Delete Selected Folders</button>
         <button id="deleteSelectedImages" class="btn btn-danger d-none mb-2 ms-2">Delete Selected Images</button>
-        <div class="table-responsive" style="max-height:400px;overflow:auto;">
+        <div class="table-responsive" style="max-height:300px;overflow:auto;">
             <table class="table table-hover rounded align-middle">
                 <thead class="bg-info text-white">
                     <tr><th>Sel. Folder</th><th>Folder</th><th>Sel. Image</th><th>Images</th><th>Actions</th></tr>
@@ -178,6 +178,102 @@
             </table>
         </div>
     </div>
+
+    <!-- Uploaded Files Management -->
+    <div class="card p-3 shadow-sm mb-4" style="border-left:4px solid #5865F2;">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <h3 class="fw-semibold mb-0"><i class="bi bi-file-earmark-arrow-up" style="color:#5865F2;"></i> Uploaded Files</h3>
+            <button class="btn btn-danger btn-sm" onclick="if(confirm('Delete ALL uploaded files?')) fetch('/admin_reset_uploads',{method:'POST'}).then(()=>location.reload());">
+                <i class="bi bi-trash"></i> Reset All
+            </button>
+        </div>
+        <p class="text-muted mb-2" style="font-size:13px;">Files sent in group chats (auto-expire after 1 hour, but you can force-delete here).</p>
+        {% if upload_folders %}
+        <div class="table-responsive" style="max-height:280px;overflow:auto;">
+            <table class="table table-hover align-middle" style="font-size:13px;">
+                <thead class="bg-secondary text-white">
+                    <tr><th>Group</th><th>Files</th><th>Total Size</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for folder in upload_folders %}
+                    <tr>
+                        <td><code>{{ folder.folder }}</code></td>
+                        <td>
+                            {% for f in folder.files %}
+                            <div class="d-flex align-items-center gap-1 mb-1">
+                                <i class="bi bi-file-earmark text-muted"></i>
+                                <span style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ f.name }}">{{ f.name }}</span>
+                                <span class="text-muted">({{ (f.size/1024)|round(1) }} KB)</span>
+                                <button class="btn btn-outline-danger btn-sm py-0 px-1 ms-1"
+                                    onclick="adminDeleteUploadFile('{{ folder.folder }}','{{ f.name }}')"
+                                    title="Delete this file"><i class="bi bi-x-lg"></i></button>
+                            </div>
+                            {% endfor %}
+                            {% if not folder.files %}<span class="text-muted">Empty</span>{% endif %}
+                        </td>
+                        <td>{{ (folder.total_size/1024)|round(1) }} KB</td>
+                        <td>
+                            <button class="btn btn-danger btn-sm" onclick="adminDeleteUploadFolder('{{ folder.folder }}')">
+                                <i class="bi bi-trash"></i> Del Folder
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted" style="font-size:13px;"><i class="bi bi-inbox"></i> No uploaded files.</p>
+        {% endif %}
+    </div>
+
+    <!-- Audio Files Management -->
+    <div class="card p-3 shadow-sm mb-4" style="border-left:4px solid #1db954;">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <h3 class="fw-semibold mb-0"><i class="bi bi-music-note-beamed" style="color:#1db954;"></i> Audio Files</h3>
+            <button class="btn btn-danger btn-sm" onclick="if(confirm('Delete ALL audio files?')) fetch('/admin_reset_audio',{method:'POST'}).then(()=>location.reload());">
+                <i class="bi bi-trash"></i> Reset All
+            </button>
+        </div>
+        <p class="text-muted mb-2" style="font-size:13px;">Audio clips sent in group chats (auto-expire after 1 hour, but you can force-delete here).</p>
+        {% if audio_folders %}
+        <div class="table-responsive" style="max-height:280px;overflow:auto;">
+            <table class="table table-hover align-middle" style="font-size:13px;">
+                <thead style="background:#1db954;color:#fff;">
+                    <tr><th>Group</th><th>Files</th><th>Total Size</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for folder in audio_folders %}
+                    <tr>
+                        <td><code>{{ folder.folder }}</code></td>
+                        <td>
+                            {% for f in folder.files %}
+                            <div class="d-flex align-items-center gap-1 mb-1">
+                                <i class="bi bi-music-note text-success"></i>
+                                <span style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ f.name }}">{{ f.name }}</span>
+                                <span class="text-muted">({{ (f.size/1024)|round(1) }} KB)</span>
+                                <button class="btn btn-outline-danger btn-sm py-0 px-1 ms-1"
+                                    onclick="adminDeleteAudioFile('{{ folder.folder }}','{{ f.name }}')"
+                                    title="Delete this file"><i class="bi bi-x-lg"></i></button>
+                            </div>
+                            {% endfor %}
+                            {% if not folder.files %}<span class="text-muted">Empty</span>{% endif %}
+                        </td>
+                        <td>{{ (folder.total_size/1024)|round(1) }} KB</td>
+                        <td>
+                            <button class="btn btn-danger btn-sm" onclick="adminDeleteAudioFolder('{{ folder.folder }}')">
+                                <i class="bi bi-trash"></i> Del Folder
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted" style="font-size:13px;"><i class="bi bi-inbox"></i> No audio files.</p>
+        {% endif %}
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -196,89 +292,90 @@ document.addEventListener("DOMContentLoaded", function() {
         document.querySelectorAll(".delete-profile-pic-btn").forEach(btn => btn.classList.toggle("d-none", !editMode));
     });
 
-    const deleteUserBtn = document.getElementById("deleteSelectedUsers");
-    if (deleteUserBtn) {
-        deleteUserBtn.addEventListener("click", () => {
-            const sel = [...document.querySelectorAll(".user-checkbox:checked")].map(cb=>cb.dataset.username);
-            if (sel.length && confirm("Delete selected users?")) {
-                fetch("/delete_users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({users:sel})}).then(()=>location.reload());
-            }
-        });
-    }
+    document.getElementById("deleteSelectedUsers").addEventListener("click", () => {
+        const sel=[...document.querySelectorAll(".user-checkbox:checked")].map(cb=>cb.dataset.username);
+        if(sel.length&&confirm("Delete selected users?"))
+            fetch("/delete_users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({users:sel})}).then(()=>location.reload());
+    });
 
-    const deleteChatBtn = document.getElementById("deleteSelectedChats");
-    if (deleteChatBtn) {
-        deleteChatBtn.addEventListener("click", () => {
-            const sel = [...document.querySelectorAll(".chat-checkbox:checked")].map(cb=>cb.dataset.chatid);
-            if (sel.length && confirm("Delete selected chats?")) {
-                fetch("/delete_chats",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chats:sel})}).then(()=>location.reload());
-            }
-        });
-    }
+    document.getElementById("deleteSelectedChats").addEventListener("click", () => {
+        const sel=[...document.querySelectorAll(".chat-checkbox:checked")].map(cb=>cb.dataset.chatid);
+        if(sel.length&&confirm("Delete selected chats?"))
+            fetch("/delete_chats",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chats:sel})}).then(()=>location.reload());
+    });
 
     document.getElementById("deleteSelectedImageFolders").addEventListener("click", () => {
-        const keys = [...document.querySelectorAll(".image-folder-checkbox:checked")].map(cb=>cb.dataset.key);
-        if (keys.length && confirm("Delete selected image folders?")) {
+        const keys=[...document.querySelectorAll(".image-folder-checkbox:checked")].map(cb=>cb.dataset.key);
+        if(keys.length&&confirm("Delete selected image folders?"))
             fetch("/delete_images_folders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keys})}).then(()=>location.reload());
-        }
     });
 
     document.getElementById("deleteSelectedImages").addEventListener("click", () => {
-        const images = [...document.querySelectorAll(".image-checkbox:checked")].map(cb=>({key:cb.dataset.key,image:cb.dataset.image}));
-        if (images.length && confirm("Delete selected images?")) {
+        const images=[...document.querySelectorAll(".image-checkbox:checked")].map(cb=>({key:cb.dataset.key,image:cb.dataset.image}));
+        if(images.length&&confirm("Delete selected images?"))
             fetch("/delete_images",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({images})}).then(()=>location.reload());
-        }
     });
 
-    const dapBtn = document.getElementById("deleteAllProfilePics");
-    if (dapBtn) {
-        dapBtn.addEventListener("click", () => {
-            if (confirm("Delete all profile pictures?")) {
-                fetch("/delete_all_profile_pics",{method:"POST"}).then(r=>r.json()).then(d=>{if(d.success){alert("Done.");location.reload();}});
-            }
-        });
-    }
+    document.getElementById("deleteAllProfilePics").addEventListener("click", () => {
+        if(confirm("Delete all profile pictures?"))
+            fetch("/delete_all_profile_pics",{method:"POST"}).then(r=>r.json()).then(d=>{if(d.success){alert("Done.");location.reload();}});
+    });
 
     document.querySelectorAll(".delete-profile-pic-btn").forEach(btn => {
         btn.addEventListener("click", function() {
-            const u = this.dataset.username;
-            if (confirm(`Delete ${u}'s profile picture?`)) {
+            const u=this.dataset.username;
+            if(confirm(`Delete ${u}'s profile picture?`))
                 fetch(`/delete_profile_pic/${u}`,{method:"POST"}).then(r=>r.json()).then(d=>{if(d.success){alert("Deleted.");location.reload();}});
-            }
         });
     });
 
     document.getElementById("resetMessagesForm").addEventListener("submit", function(e) {
         e.preventDefault();
-        if (confirm("Delete ALL group chat messages?")) {
+        if(confirm("Delete ALL group chat messages?"))
             fetch("{{ url_for('reset_messages') }}",{method:"POST"}).then(r=>{if(r.ok){alert("Reset!");location.reload();}else alert("Failed.");});
-        }
     });
 
-    // Custom group code creation
     document.getElementById("customGroupForm").addEventListener("submit", function(e) {
         e.preventDefault();
-        const code = document.getElementById("customGroupCode").value.trim();
-        if (!code) return;
-        fetch("/create_custom_group", {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({code: code})
-        }).then(r=>r.json()).then(data=>{
-            const result = document.getElementById("customGroupResult");
-            result.style.display = 'block';
-            if (data.success) {
-                result.innerHTML = `<div class="alert alert-success d-flex align-items-center gap-3">
-                    <span>✓ Group <strong>${data.code}</strong> created!</span>
-                    <a href="/chat_room/${data.code}" class="btn btn-sm btn-success">Join Now</a>
-                </div>`;
-                document.getElementById("customGroupCode").value = '';
-            } else {
-                result.innerHTML = `<div class="alert alert-danger">${data.error || 'Failed to create group.'}</div>`;
-            }
-        });
+        const code=document.getElementById("customGroupCode").value.trim();
+        if(!code) return;
+        fetch("/create_custom_group",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})})
+            .then(r=>r.json()).then(data=>{
+                const result=document.getElementById("customGroupResult");
+                result.style.display='block';
+                if(data.success){
+                    result.innerHTML=`<div class="alert alert-success d-flex align-items-center gap-3"><span>✓ Group <strong>${data.code}</strong> created!</span><a href="/chat_room/${data.code}" class="btn btn-sm btn-success">Join Now</a></div>`;
+                    document.getElementById("customGroupCode").value='';
+                } else {
+                    result.innerHTML=`<div class="alert alert-danger">${data.error||'Failed to create group.'}</div>`;
+                }
+            });
     });
 });
+
+// Upload file admin actions
+function adminDeleteUploadFolder(folder) {
+    if(!confirm(`Delete all files in upload folder "${folder}"?`)) return;
+    fetch(`/admin_delete_upload_folder/${encodeURIComponent(folder)}`,{method:'POST'})
+        .then(r=>r.json()).then(d=>{if(d.success)location.reload();else alert('Failed.');});
+}
+function adminDeleteUploadFile(folder, filename) {
+    if(!confirm(`Delete file "${filename}"?`)) return;
+    fetch('/admin_delete_upload_file',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder,filename})})
+        .then(r=>r.json()).then(d=>{if(d.success)location.reload();else alert('Failed.');});
+}
+
+// Audio file admin actions
+function adminDeleteAudioFolder(folder) {
+    if(!confirm(`Delete all audio in folder "${folder}"?`)) return;
+    fetch(`/admin_delete_audio_folder/${encodeURIComponent(folder)}`,{method:'POST'})
+        .then(r=>r.json()).then(d=>{if(d.success)location.reload();else alert('Failed.');});
+}
+function adminDeleteAudioFile(folder, filename) {
+    if(!confirm(`Delete audio file "${filename}"?`)) return;
+    fetch('/admin_delete_audio_file',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder,filename})})
+        .then(r=>r.json()).then(d=>{if(d.success)location.reload();else alert('Failed.');});
+}
 </script>
 
 <style>

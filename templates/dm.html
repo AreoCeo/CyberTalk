@@ -14,8 +14,11 @@
         <div class="dm-list">
             {% for convo in conversations %}
             <a href="/dm/{{ convo.username }}" class="dm-user-btn {% if active_user == convo.username %}active{% endif %}">
-                <img src="/static/profile_pics/{{ convo.profile_pic }}" alt="avatar" class="dm-user-avatar"
-                     onerror="this.src='/static/profile_pics/default.png'">
+                <div style="position:relative;flex-shrink:0;">
+                    <img src="/static/profile_pics/{{ convo.profile_pic }}" alt="avatar" class="dm-user-avatar"
+                        onerror="this.src='/static/profile_pics/default.png'">
+                    <span class="dm-status-dot dm-status-dot--{{ convo.status }}" title="{{ convo.status }}"></span>
+                </div>
                 <div class="dm-user-info">
                     <span class="dm-username">{{ convo.username }}</span>
                     {% if convo.unread %}
@@ -84,6 +87,15 @@
 </div>
 
 <style>
+    .dm-status-dot {
+    position: absolute; bottom: 0; right: 0;
+    width: 11px; height: 11px; border-radius: 50%;
+    border: 2px solid var(--bg-side);
+}
+.dm-status-dot--online  { background: #23a559; }
+.dm-status-dot--away    { background: #f0b232; }
+.dm-status-dot--offline { background: #80848e; }
+
 [data-theme="dark"] .dm-layout,
 .dm-layout {
     --bg-side: #2b2d31;

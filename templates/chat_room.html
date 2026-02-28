@@ -5,7 +5,25 @@
 <div class="container chat-container">
     <div class="d-flex justify-content-between align-items-center chat-header">
         <h3 class="mb-0">Group: <span style="color:#5865F2;">{{ key }}</span></h3>
-        <a href="/dm" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chat-dots"></i> DMs</a>
+        <div class="d-flex gap-2 align-items-center">
+            <!-- Members dropdown -->
+            <div class="dropdown" id="membersDropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                    id="membersDropBtn" title="Who's here">
+                    <i class="bi bi-people-fill"></i>
+                    <span id="memberCount" style="font-size:12px;margin-left:3px;">...</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end members-panel" id="membersPanel" style="display:none;">
+                    <div class="members-panel-header">
+                        <i class="bi bi-people-fill"></i> Members
+                    </div>
+                    <div id="membersList" class="members-list">
+                        <div style="color:#72767d;font-size:13px;padding:10px;">Loading...</div>
+                    </div>
+                </div>
+            </div>
+            <a href="/dm" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chat-dots"></i> DMs</a>
+        </div>
     </div>
     <div class="chat-window" style="position: relative; flex: 1 1 0; display: flex; flex-direction: column; min-height: 0;">
         <div id="replyBar" style="display:none; background:#2a2d31; color:#fff; border-radius:6px 6px 0 0; padding:8px 12px 8px 24px; margin-bottom:-2px; position:relative; border-left: 3px solid #5865F2; flex-shrink: 0;">
@@ -17,14 +35,14 @@
             style="display:none; position: absolute; right: -52px; bottom: 80px; z-index: 10; background: transparent; border: none; box-shadow: none;">
             <span class="fs-2 text-danger"><i class="bi bi-exclamation-circle-fill"></i></span>
         </button>
-        <div class="d-flex align-items-center input-row">
-            <button type="button" class="btn btn-success plus-btn"
-                title="Add Photo"
-                onclick="document.getElementById('imageInput').click();"
+        <div class="d-flex align-items-center input-row" style="position:relative;">
+            <button type="button" class="btn btn-success plus-btn" id="plusBtn" title="Attach"
                 style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;font-size:22px;flex-shrink:0;">
-                <span style="font-size:28px;line-height:0;">&#43;</span>
+                <i class="bi bi-plus-lg" style="font-size:18px;"></i>
             </button>
             <input type="file" id="imageInput" accept="image/*" style="display:none;" onchange="uploadImage(event,'{{ key }}')">
+            <input type="file" id="fileInput" style="display:none;" onchange="uploadFile(event,'{{ key }}')">
+            <input type="file" id="audioInput" accept="audio/*" style="display:none;" onchange="uploadAudio(event,'{{ key }}')">
             <form id="sendMessageForm" class="flex-grow-1 d-flex" method="POST" style="gap:8px;">
                 <input type="text" name="message" id="messageInput" class="form-control" placeholder="Type message" autocomplete="off">
                 <button class="btn btn-primary" type="submit" style="flex-shrink:0;">Send</button>
@@ -32,12 +50,35 @@
         </div>
         <div id="typingIndicator" class="typing-indicator-outer"></div>
     </div>
+
+    <!-- Attach popup -->
+    <div id="attachMenu" class="attach-menu" style="display:none;">
+        <button class="attach-item" onclick="triggerFileInput()">
+            <i class="bi bi-file-earmark-arrow-up attach-icon"></i><span>Insert File</span>
+        </button>
+        <button class="attach-item" onclick="triggerImageInput()">
+            <i class="bi bi-image attach-icon"></i><span>Insert Photo</span>
+        </button>
+        <button class="attach-item" onclick="triggerAudioInput()">
+            <i class="bi bi-music-note-beamed attach-icon"></i><span>Audio</span>
+        </button>
+    </div>
+
+    <!-- Upload overlay -->
+    <div id="uploadOverlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.55);z-index:50000;align-items:center;justify-content:center;">
+        <div style="background:#2b2d31;border-radius:14px;padding:32px 40px;text-align:center;color:#fff;min-width:240px;box-shadow:0 8px 40px #000a;">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <div id="uploadStatusText" style="font-size:15px;color:#b9bbbe;">Uploading...</div>
+        </div>
+    </div>
+
     <div id="fullscreenImageModal" style="display:none;position:fixed;z-index:20000;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;">
         <img id="fullscreenImage" src="" alt="Full size" style="max-width:90vw;max-height:90vh;border-radius:16px;box-shadow:0 2px 32px #222;" />
         <button onclick="closeFullscreenImage()" style="position:absolute;top:32px;right:40px;font-size:2rem;background:transparent;border:none;color:white;z-index:20001;">&times;</button>
     </div>
 </div>
 
+<!-- Context menu -->
 <div id="ctxMenu" style="display:none;position:fixed;z-index:99999;background:#2b2d31;border:1px solid #3f4147;border-radius:8px;padding:6px 0;min-width:185px;box-shadow:0 8px 32px #0009;">
     <div class="ctx-item" id="ctxReply"><i class="bi bi-reply-fill"></i> Reply</div>
     <div class="ctx-item" id="ctxCopy"><i class="bi bi-clipboard"></i> Copy Text</div>
@@ -46,10 +87,10 @@
     <div class="ctx-item ctx-danger" id="ctxDelete" style="display:none;"><i class="bi bi-trash-fill"></i> Delete Message</div>
 </div>
 
+<!-- DM forward modal -->
 <div id="dmModal" style="display:none;position:fixed;z-index:100000;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
     <div style="background:#2b2d31;border-radius:12px;padding:28px 24px;min-width:300px;max-width:400px;width:90%;box-shadow:0 8px 40px #0009;">
         <h5 style="color:#fff;margin-bottom:16px;"><i class="bi bi-send-fill"></i> Forward to DM</h5>
-        <p style="color:#b9bbbe;font-size:13px;">Select a user to forward this message to:</p>
         <select id="dmUserSelect" class="form-select mb-3" style="background:#1e1f22;color:#fff;border:1px solid #3f4147;"></select>
         <div style="display:flex;gap:10px;">
             <button id="dmSendBtn" class="btn btn-primary" style="flex:1;">Send</button>
@@ -72,52 +113,120 @@ html, body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; }
     padding:15px; border-radius:10px; background:#23272a;
     display:flex; flex-direction:column; gap:10px;
 }
-.input-row { 
-    margin-top:0 !important; 
-    padding:6px 0 2px 0; 
-    gap:8px; 
-    flex-shrink: 0; 
-    padding-bottom: env(safe-area-inset-bottom);
-}
-.discord-message {
-    display:flex; align-items:flex-start; gap:10px; padding:4px 8px 4px 4px;
-    cursor:default; user-select:text; position:relative; border-radius:6px;
-    transition:background 0.1s;
-}
+.input-row { margin-top:0 !important; padding:6px 0 2px 0; gap:8px; flex-shrink: 0; padding-bottom: env(safe-area-inset-bottom); }
+.discord-message { display:flex; align-items:flex-start; gap:10px; padding:4px 8px 4px 4px; cursor:default; user-select:text; position:relative; border-radius:6px; transition:background 0.1s; }
 .discord-message:hover { background:rgba(255,255,255,0.04); }
 .discord-avatar { width:44px; height:44px; border-radius:50%; object-fit:cover; background:#2f3136; border:2px solid #23272A; margin-top:1px; flex-shrink:0; }
 .discord-bubble { flex:1 1 0; display:flex; flex-direction:column; min-width:0; }
 .discord-header { display:flex; align-items:baseline; gap:7px; flex-wrap:wrap; }
 .discord-username { font-weight:700; color:#4EF2F7; font-size:15px; }
-.discord-you { color:#b9bbbe; font-size:14px; font-style:normal; }
+.discord-you { color:#b9bbbe; font-size:14px; }
 .discord-timestamp { color:#b9bbbe; font-size:12px; }
 .discord-content { color:#dcddde; font-size:15px; margin-top:2px; word-break:break-word; }
 .discord-message.sent .discord-username { color:#f7b24e; }
 .chat-image { max-width:280px; max-height:220px; border-radius:10px; margin:5px 0; display:block; cursor:pointer; transition:box-shadow .25s; }
 .chat-image:hover { box-shadow:0 4px 24px #2225; }
-.reply-context { font-size:13px; color:#4EF2F7; background:#2a2d31; border-left:3px solid #4EF2F7; border-radius:4px; padding:3px 8px; margin-bottom:3px; max-width:350px; overflow-x:auto; white-space:pre-line; }
+.reply-context { font-size:13px; color:#4EF2F7; background:#2a2d31; border-left:3px solid #4EF2F7; border-radius:4px; padding:3px 8px; margin-bottom:3px; max-width:350px; overflow-x:auto; }
 .reply-context strong { color:#2ec4b6; }
 .mention-highlight-bubble { background:#f9e69b !important; border-left:4px solid #f8d363; box-shadow:0 0 8px #f8d36333; border-radius:8px; color:#23272a !important; font-weight:500; }
-.mention-highlight-bubble .discord-content, .mention-highlight-bubble .discord-timestamp, .mention-highlight-bubble .discord-username, .mention-highlight-bubble .discord-you { color:#23272a !important; }
+.mention-highlight-bubble .discord-content,.mention-highlight-bubble .discord-timestamp,.mention-highlight-bubble .discord-username,.mention-highlight-bubble .discord-you { color:#23272a !important; }
 button:focus, input:focus, textarea:focus, select:focus { outline:none !important; box-shadow:none !important; }
 .typing-indicator-outer { min-height:22px; margin-bottom:2px; margin-left:56px; color:#b9bbbe; font-size:14px; display:flex; align-items:center; gap:6px; flex-shrink: 0; }
 .typing-dot { display:inline-block; width:6px; height:6px; margin-right:2px; border-radius:50%; background:#b9bbbe; opacity:0.45; animation:typing-bounce 1.2s infinite both; }
 .typing-dot:nth-child(1){animation-delay:0s}.typing-dot:nth-child(2){animation-delay:0.2s}.typing-dot:nth-child(3){animation-delay:0.4s}
-@keyframes typing-bounce { 0%,80%,100%{opacity:0.45;transform:translateY(0)} 40%{opacity:1;transform:translateY(-3px)} }
+@keyframes typing-bounce{0%,80%,100%{opacity:0.45;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 .ctx-item { padding:9px 16px; color:#dcddde; font-size:14px; cursor:pointer; display:flex; align-items:center; gap:10px; transition:background 0.1s; }
 .ctx-item:hover { background:#404249; }
 .ctx-danger { color:#ed4245 !important; }
 .ctx-danger:hover { background:rgba(237,66,69,0.12) !important; }
 .ctx-divider { border-top:1px solid #3f4147; margin:4px 0; }
+
+/* Attach popup */
+.attach-menu { position:fixed; background:#2b2d31; border:1px solid #3f4147; border-radius:12px; padding:6px; z-index:9999; box-shadow:0 8px 32px rgba(0,0,0,0.55); min-width:190px; animation:attachMenuIn 0.16s cubic-bezier(.4,0,.2,1); }
+@keyframes attachMenuIn{from{opacity:0;transform:translateY(8px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.attach-item { display:flex; align-items:center; gap:12px; width:100%; background:none; border:none; color:#dcddde; font-size:14px; padding:10px 14px; border-radius:8px; cursor:pointer; transition:background 0.12s; text-align:left; }
+.attach-item:hover { background:#404249; color:#fff; }
+.attach-icon { font-size:17px; width:20px; text-align:center; }
+
+/* File card */
+.file-card { display:inline-flex; align-items:center; gap:12px; background:#2f3136; border:1px solid #3f4147; border-radius:10px; padding:10px 14px; margin:4px 0; max-width:340px; cursor:pointer; text-decoration:none; color:#dcddde; transition:background 0.15s; }
+.file-card:hover { background:#36393f; color:#fff; }
+.file-card-icon { font-size:26px; color:#5865F2; flex-shrink:0; }
+.file-card-info { min-width:0; }
+.file-card-name { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; color:#80bdff; }
+.file-card-size { font-size:12px; color:#b9bbbe; margin-top:2px; }
+.file-card-expires { font-size:11px; color:#72767d; margin-top:1px; }
+
+/* Audio player */
+.audio-player-card { display:flex; align-items:center; gap:12px; background:#2f3136; border:1px solid #3f4147; border-radius:12px; padding:10px 14px; margin:4px 0; max-width:370px; }
+.audio-play-btn { width:38px; height:38px; border-radius:50%; background:#5865F2; border:none; color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; cursor:pointer; flex-shrink:0; transition:background 0.15s,transform 0.1s; }
+.audio-play-btn:hover { background:#4752c4; transform:scale(1.07); }
+.audio-waveform-canvas { flex:1; height:40px; cursor:pointer; border-radius:4px; }
+.audio-time { font-size:12px; color:#b9bbbe; white-space:nowrap; flex-shrink:0; min-width:38px; text-align:right; }
+.audio-expires { font-size:11px; color:#72767d; margin-top:2px; }
+
+/* ── Status dots ── */
+.status-dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 2px solid #2b2d31;
+}
+.status-dot.online  { background: #23a559; }
+.status-dot.away    { background: #f0b232; }
+.status-dot.offline { background: #80848e; }
+
+/* Avatar wrapper for status dot overlay */
+.avatar-wrap { position: relative; display: inline-block; flex-shrink: 0; }
+.avatar-wrap .status-dot {
+    position: absolute; bottom: 1px; right: 1px;
+    width: 11px; height: 11px;
+    border: 2px solid #23272a;
+}
+
+/* ── Members panel ── */
+.members-panel {
+    background: #2b2d31;
+    border: 1px solid #3f4147 !important;
+    border-radius: 10px !important;
+    padding: 0 !important;
+    min-width: 230px;
+    max-height: 420px;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.members-panel-header {
+    padding: 12px 16px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: #8e9297;
+    border-bottom: 1px solid #3f4147;
+}
+.members-list { padding: 6px 0; }
+.member-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 14px; cursor: default;
+    transition: background 0.12s;
+}
+.member-row:hover { background: #36393f; }
+.member-row img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.member-row .member-name { font-size: 14px; color: #dcddde; font-weight: 500; }
+.member-row .member-status-text { font-size: 11px; color: #8e9297; margin-top:1px; }
+.member-section-label { padding: 10px 14px 3px; font-size: 11px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; color:#8e9297; }
+
 @media (max-width:600px) {
     .chat-container { padding:0 !important; }
     .message-box { padding:6px; }
     .typing-indicator-outer { margin-left:40px; font-size:13px; }
     .discord-avatar { width:34px; height:34px; }
-    .discord-username,.discord-content { font-size:14px; }
     .chat-image { max-width:190px; max-height:150px; }
     .chat-header h3 { font-size:1rem; }
     .input-row { padding:4px 2px; }
+    .attach-menu { left:4px !important; }
+    .members-panel { min-width: 190px; }
 }
 </style>
 
@@ -129,293 +238,373 @@ function setChatHeight() {
 window.addEventListener('resize', setChatHeight);
 window.addEventListener('DOMContentLoaded', setChatHeight);
 
-const key = "{{ key }}";
-const messagesContainer = document.getElementById('messages');
-const newMessageIndicator = document.getElementById('newMessageIndicator');
+const key         = "{{ key }}";
 const currentUser = "{{ current_user.username }}";
+const messagesContainer   = document.getElementById('messages');
+const newMessageIndicator = document.getElementById('newMessageIndicator');
 let renderedMessageIds = new Set();
 
-// --- CONTEXT MENU ---
+// ── HEARTBEAT (presence) ──────────────────────────────────────────────────
+// Detect if we're running inside the PyQt app
+const isApp = navigator.userAgent.includes('QtWebEngine') || navigator.userAgent.includes('CybertalkApp');
+
+function sendHeartbeat() {
+    const focused = document.visibilityState === 'visible' && document.hasFocus();
+    fetch('/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ focused: focused, source: isApp ? 'app' : 'web' })
+    }).catch(() => {});
+}
+// Send immediately and then every 5 seconds
+sendHeartbeat();
+setInterval(sendHeartbeat, 5000);
+
+// ── MEMBERS PANEL ─────────────────────────────────────────────────────────
+const membersDropBtn = document.getElementById('membersDropBtn');
+const membersPanel   = document.getElementById('membersPanel');
+let membersOpen = false;
+let membersData = [];
+
+function statusLabel(s) {
+    if (s === 'online') return 'Online';
+    if (s === 'away')   return 'Away';
+    return 'Offline';
+}
+
+function renderMembers(members) {
+    const list = document.getElementById('membersList');
+    if (!members.length) {
+        list.innerHTML = '<div style="color:#72767d;font-size:13px;padding:10px;">No members yet.</div>';
+        return;
+    }
+    const groups = { online: [], away: [], offline: [] };
+    members.forEach(m => (groups[m.status] || groups.offline).push(m));
+
+    let html = '';
+    [['online','Online','#23a559'], ['away','Away','#f0b232'], ['offline','Offline','#80848e']].forEach(([s, label, color]) => {
+        if (!groups[s].length) return;
+        html += `<div class="member-section-label" style="color:${color};">${label} — ${groups[s].length}</div>`;
+        groups[s].forEach(m => {
+            const pic = m.profile_pic ? `/static/profile_pics/${m.profile_pic}` : '/static/profile_pics/default.png';
+            html += `
+            <div class="member-row">
+                <div class="avatar-wrap">
+                    <img src="${pic}" onerror="this.src='/static/profile_pics/default.png'" alt="">
+                    <span class="status-dot ${m.status}"></span>
+                </div>
+                <div>
+                    <div class="member-name">${m.username}${m.username === currentUser ? ' <span style="color:#b9bbbe;font-size:11px;">(you)</span>' : ''}</div>
+                    <div class="member-status-text">${statusLabel(m.status)}${m.source && m.source !== 'web' ? ' · via app' : ''}</div>
+                </div>
+            </div>`;
+        });
+    });
+    list.innerHTML = html;
+}
+
+function fetchMembers() {
+    fetch(`/get_group_members/${key}`)
+        .then(r => r.json())
+        .then(d => {
+            membersData = d.members || [];
+            document.getElementById('memberCount').textContent = membersData.length;
+            renderMembers(membersData);
+        }).catch(() => {});
+}
+
+membersDropBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    membersOpen = !membersOpen;
+    membersPanel.style.display = membersOpen ? 'block' : 'none';
+    if (membersOpen) fetchMembers();
+});
+document.addEventListener('click', (e) => {
+    if (membersOpen && !membersPanel.contains(e.target) && e.target !== membersDropBtn) {
+        membersOpen = false;
+        membersPanel.style.display = 'none';
+    }
+});
+
+// Refresh members every 10s
+fetchMembers();
+setInterval(fetchMembers, 10000);
+
+// ── ATTACH MENU ───────────────────────────────────────────────────────────
+const plusBtn    = document.getElementById('plusBtn');
+const attachMenu = document.getElementById('attachMenu');
+let attachMenuOpen = false;
+
+plusBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    attachMenuOpen = !attachMenuOpen;
+    if (attachMenuOpen) {
+        const r = plusBtn.getBoundingClientRect();
+        attachMenu.style.left   = r.left + 'px';
+        attachMenu.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+        attachMenu.style.top    = 'auto';
+        attachMenu.style.display = 'block';
+    } else {
+        attachMenu.style.display = 'none';
+    }
+});
+document.addEventListener('click', (e) => {
+    if (attachMenuOpen && !attachMenu.contains(e.target) && e.target !== plusBtn) {
+        attachMenuOpen = false; attachMenu.style.display = 'none';
+    }
+});
+function closeAttachMenu() { attachMenuOpen = false; attachMenu.style.display = 'none'; }
+function triggerFileInput()  { closeAttachMenu(); document.getElementById('fileInput').click(); }
+function triggerImageInput() { closeAttachMenu(); document.getElementById('imageInput').click(); }
+function triggerAudioInput() { closeAttachMenu(); document.getElementById('audioInput').click(); }
+
+function showUploadOverlay(text) { document.getElementById('uploadStatusText').textContent = text||'Uploading...'; document.getElementById('uploadOverlay').style.display='flex'; }
+function hideUploadOverlay() { document.getElementById('uploadOverlay').style.display='none'; }
+
+// ── CONTEXT MENU ──────────────────────────────────────────────────────────
 const ctxMenu = document.getElementById('ctxMenu');
-let ctxTargetMessage = null;
-let longPressTimer = null;
+let ctxTargetMessage = null, longPressTimer = null;
 
 function showCtxMenu(x, y, message) {
     ctxTargetMessage = message;
-    document.getElementById('ctxDelete').style.display = (message.username === currentUser) ? 'flex' : 'none';
+    document.getElementById('ctxDelete').style.display = (message.username===currentUser)?'flex':'none';
     ctxMenu.style.display = 'block';
-    const safeX = Math.min(x, window.innerWidth - 200);
-    const safeY = Math.min(y, window.innerHeight - 170);
-    ctxMenu.style.left = Math.max(4, safeX) + 'px';
-    ctxMenu.style.top = Math.max(4, safeY) + 'px';
+    ctxMenu.style.left = Math.max(4,Math.min(x,window.innerWidth-200))+'px';
+    ctxMenu.style.top  = Math.max(4,Math.min(y,window.innerHeight-170))+'px';
 }
-function hideCtxMenu() { ctxMenu.style.display = 'none'; ctxTargetMessage = null; }
+function hideCtxMenu() { ctxMenu.style.display='none'; ctxTargetMessage=null; }
 document.addEventListener('click', hideCtxMenu);
 document.addEventListener('scroll', hideCtxMenu, true);
-ctxMenu.addEventListener('click', e => e.stopPropagation());
+ctxMenu.addEventListener('click', e=>e.stopPropagation());
 
-document.getElementById('ctxReply').addEventListener('click', () => {
-    if (ctxTargetMessage) showReplyBar(ctxTargetMessage);
-    hideCtxMenu();
-});
-document.getElementById('ctxCopy').addEventListener('click', () => {
-    if (ctxTargetMessage) {
-        const text = ctxTargetMessage.message || '[Image]';
-        navigator.clipboard ? navigator.clipboard.writeText(text) : (function(){
-            const el = document.createElement('textarea'); el.value = text;
-            document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
-        })();
-    }
-    hideCtxMenu();
-});
-document.getElementById('ctxDelete').addEventListener('click', () => {
-    if (ctxTargetMessage && ctxTargetMessage.username === currentUser) {
-        if (confirm('Delete this message?')) {
-            fetch(`/delete_message/${key}/${ctxTargetMessage.id}`, { method:'POST', headers:{'Content-Type':'application/json'} })
-                .then(() => { renderedMessageIds.delete(ctxTargetMessage.id); rebuildMessages(); });
-        }
-    }
-    hideCtxMenu();
-});
-document.getElementById('ctxForward').addEventListener('click', () => {
-    if (ctxTargetMessage) openDmModal(ctxTargetMessage);
-    hideCtxMenu();
-});
+document.getElementById('ctxReply').addEventListener('click',  ()=>{ if(ctxTargetMessage) showReplyBar(ctxTargetMessage); hideCtxMenu(); });
+document.getElementById('ctxCopy').addEventListener('click',   ()=>{ if(ctxTargetMessage){const t=ctxTargetMessage.message||'[Attachment]';navigator.clipboard?navigator.clipboard.writeText(t):(()=>{const e=document.createElement('textarea');e.value=t;document.body.appendChild(e);e.select();document.execCommand('copy');document.body.removeChild(e);})();} hideCtxMenu(); });
+document.getElementById('ctxDelete').addEventListener('click', ()=>{ if(ctxTargetMessage&&ctxTargetMessage.username===currentUser){if(confirm('Delete this message?')){fetch(`/delete_message/${key}/${ctxTargetMessage.id}`,{method:'POST',headers:{'Content-Type':'application/json'}}).then(()=>{renderedMessageIds.delete(ctxTargetMessage.id);rebuildMessages();});}} hideCtxMenu(); });
+document.getElementById('ctxForward').addEventListener('click',()=>{ if(ctxTargetMessage) openDmModal(ctxTargetMessage); hideCtxMenu(); });
 
-function rebuildMessages() {
-    messagesContainer.innerHTML = '';
-    renderedMessageIds = new Set();
-    fetchMessages(false);
-}
+function rebuildMessages() { messagesContainer.innerHTML=''; renderedMessageIds=new Set(); fetchMessages(false); }
 
-// --- DM MODAL ---
+// ── DM MODAL ──────────────────────────────────────────────────────────────
 function openDmModal(message) {
-    const modal = document.getElementById('dmModal');
-    const sel = document.getElementById('dmUserSelect');
-    sel.innerHTML = '<option>Loading...</option>';
-    modal.style.display = 'flex';
-    fetch('/get_users').then(r => r.json()).then(data => {
-        sel.innerHTML = '';
-        (data.users || []).filter(u => u !== currentUser).forEach(u => {
-            const o = document.createElement('option'); o.value = u; o.textContent = u; sel.appendChild(o);
-        });
-        if (!sel.options.length) sel.innerHTML = '<option>No other users</option>';
+    const modal=document.getElementById('dmModal'),sel=document.getElementById('dmUserSelect');
+    sel.innerHTML='<option>Loading...</option>'; modal.style.display='flex';
+    fetch('/get_users').then(r=>r.json()).then(data=>{
+        sel.innerHTML='';
+        (data.users||[]).filter(u=>u!==currentUser).forEach(u=>{const o=document.createElement('option');o.value=u;o.textContent=u;sel.appendChild(o);});
+        if(!sel.options.length) sel.innerHTML='<option>No other users</option>';
     });
-    document.getElementById('dmSendBtn').onclick = function() {
-        const toUser = sel.value;
-        if (!toUser) return;
-        fetch('/send_dm', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ to: toUser, message: message.message || '[Image]', image_url: message.image_url || null })
-        }).then(r => r.json()).then(d => {
-            if (d.success) { closeDmModal(); alert('Forwarded to ' + toUser + '!'); }
-        });
+    document.getElementById('dmSendBtn').onclick=function(){
+        const toUser=sel.value; if(!toUser) return;
+        fetch('/send_dm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:toUser,message:message.message||'[Attachment]',image_url:message.image_url||null})})
+            .then(r=>r.json()).then(d=>{if(d.success){closeDmModal();alert('Forwarded to '+toUser+'!');}});
     };
 }
-function closeDmModal() { document.getElementById('dmModal').style.display = 'none'; }
+function closeDmModal() { document.getElementById('dmModal').style.display='none'; }
 
-// --- REPLY BAR ---
+// ── REPLY ─────────────────────────────────────────────────────────────────
 let replyToMessage = null;
-function showReplyBar(message) {
-    replyToMessage = message;
-    document.getElementById('replyBar').style.display = 'block';
-    document.getElementById('replyPreview').textContent =
-        `Replying to ${message.username}: "${(message.message||'[Image]').slice(0,60)}${(message.message||'').length > 60 ? '...' : ''}"`;
+function showReplyBar(msg) {
+    replyToMessage=msg;
+    document.getElementById('replyBar').style.display='block';
+    document.getElementById('replyPreview').textContent=`Replying to ${msg.username}: "${(msg.message||'[Attachment]').slice(0,60)}${(msg.message||'').length>60?'...':''}"`;
     document.getElementById('messageInput').focus();
 }
-function hideReplyBar() {
-    replyToMessage = null;
-    document.getElementById('replyBar').style.display = 'none';
-    document.getElementById('replyPreview').textContent = '';
-}
+function hideReplyBar() { replyToMessage=null; document.getElementById('replyBar').style.display='none'; document.getElementById('replyPreview').textContent=''; }
 document.getElementById('cancelReplyBtn').addEventListener('click', hideReplyBar);
 
-// --- TYPING ---
-// Reduced polling: typing status every 2.5s instead of 1s
-const typingIndicator = document.getElementById('typingIndicator');
-let typing = false, typingTimeout = null, typingUsers = [];
-function sendTypingEvent() {
-    if (!typing) { typing = true; fetch(`/typing/${key}`, {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); }
-    if (typingTimeout) clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(stopTyping, 2500);
-}
-function stopTyping() {
-    if (!typing) return;
-    typing = false;
-    fetch(`/typing_stop/${key}`, {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-}
-function fetchTypingUsers() {
-    fetch(`/typing_status/${key}`).then(r=>r.json()).then(data=>{
-        typingUsers = data.typing||[];
-        const others = typingUsers.filter(u=>u!==currentUser);
-        if (!others.length) { typingIndicator.innerHTML=''; return; }
-        const names = others.length===1?`${others[0]} is typing`:others.length===2?`${others[0]} and ${others[1]} are typing`:`${others[0]} and ${others.length-1} more are typing`;
-        typingIndicator.innerHTML = `<span>${names}</span><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>`;
-    }).catch(()=>{});
-}
-const messageInput = document.getElementById('messageInput');
-messageInput.addEventListener('input', () => messageInput.value ? sendTypingEvent() : stopTyping());
-messageInput.addEventListener('blur', stopTyping);
+// ── TYPING ────────────────────────────────────────────────────────────────
+const typingIndicator=document.getElementById('typingIndicator');
+let typing=false,typingTimeout=null;
+function sendTypingEvent(){if(!typing){typing=true;fetch(`/typing/${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});}if(typingTimeout)clearTimeout(typingTimeout);typingTimeout=setTimeout(stopTyping,2500);}
+function stopTyping(){if(!typing)return;typing=false;fetch(`/typing_stop/${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});}
+function fetchTypingUsers(){fetch(`/typing_status/${key}`).then(r=>r.json()).then(data=>{const others=(data.typing||[]).filter(u=>u!==currentUser);if(!others.length){typingIndicator.innerHTML='';return;}const names=others.length===1?`${others[0]} is typing`:others.length===2?`${others[0]} and ${others[1]} are typing`:`${others[0]} and ${others.length-1} more are typing`;typingIndicator.innerHTML=`<span>${names}</span><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>`;}).catch(()=>{});}
+const messageInput=document.getElementById('messageInput');
+messageInput.addEventListener('input',()=>messageInput.value?sendTypingEvent():stopTyping());
+messageInput.addEventListener('blur',stopTyping);
+setInterval(fetchTypingUsers,2500);
+window.addEventListener('beforeunload',()=>stopTyping());
 
-// Poll typing every 2500ms instead of 1000ms
-setInterval(fetchTypingUsers, 2500);
-window.addEventListener('beforeunload', () => { stopTyping(); });
+// ── HELPERS ───────────────────────────────────────────────────────────────
+function formatFileSize(b){if(!b)return'';if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB';}
+function getFileIconClass(f){const e=(f||'').split('.').pop().toLowerCase();const m={pdf:'bi-file-earmark-pdf text-danger',zip:'bi-file-earmark-zip text-warning',rar:'bi-file-earmark-zip text-warning','7z':'bi-file-earmark-zip text-warning',tar:'bi-file-earmark-zip text-warning',gz:'bi-file-earmark-zip text-warning',doc:'bi-file-earmark-word text-primary',docx:'bi-file-earmark-word text-primary',txt:'bi-file-earmark-text',md:'bi-file-earmark-text',xls:'bi-file-earmark-excel text-success',xlsx:'bi-file-earmark-excel text-success',csv:'bi-file-earmark-spreadsheet text-success',ppt:'bi-file-earmark-slides text-warning',pptx:'bi-file-earmark-slides text-warning',mp4:'bi-film text-info',mov:'bi-film text-info',avi:'bi-film text-info',mkv:'bi-film text-info',webm:'bi-film text-info',mp3:'bi-music-note-beamed',wav:'bi-music-note-beamed',ogg:'bi-music-note-beamed',flac:'bi-music-note-beamed',m4a:'bi-music-note-beamed',jpg:'bi-file-earmark-image text-info',jpeg:'bi-file-earmark-image text-info',png:'bi-file-earmark-image text-info',gif:'bi-file-earmark-image text-info',py:'bi-file-earmark-code text-warning',js:'bi-file-earmark-code text-warning',html:'bi-file-earmark-code text-danger',css:'bi-file-earmark-code text-primary',json:'bi-file-earmark-code',ts:'bi-file-earmark-code text-primary',exe:'bi-gear-fill',dmg:'bi-apple',apk:'bi-android2 text-success'};return m[e]||'bi-file-earmark';}
 
-// --- MESSAGES ---
-function getMessageId(m) { return m.id || JSON.stringify([m.timestamp,m.username,m.message,m.image_url]); }
-function isAtBottom() { return messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 40; }
-function scrollToBottom() { messagesContainer.scrollTop = messagesContainer.scrollHeight; }
-function isMessageRecent(ts) { try { return (new Date()-new Date(ts))/1000 < 60; } catch{return false;} }
-function notifyUser(msg) {
-    if (!("Notification" in window)||Notification.permission!=="granted") return;
-    new Notification("New message from "+msg.username,{body:msg.message||"Sent an image",icon:"/static/favicon.ico"});
+// ── AUDIO PLAYER ──────────────────────────────────────────────────────────
+let sharedAudioCtx = null;
+function getAudioCtx(){if(!sharedAudioCtx||sharedAudioCtx.state==='closed')sharedAudioCtx=new(window.AudioContext||window.webkitAudioContext)();return sharedAudioCtx;}
+
+async function buildWaveformData(audioUrl, barCount) {
+    try {
+        const ctx=getAudioCtx();
+        const resp=await fetch(audioUrl);
+        const ab=await resp.arrayBuffer();
+        const audioBuf=await ctx.decodeAudioData(ab);
+        const raw=audioBuf.getChannelData(0);
+        const step=Math.floor(raw.length/barCount);
+        const peaks=[];
+        for(let i=0;i<barCount;i++){let max=0;for(let j=0;j<step;j++){const a=Math.abs(raw[i*step+j]||0);if(a>max)max=a;}peaks.push(max);}
+        const gm=Math.max(...peaks,0.001);
+        return peaks.map(p=>p/gm);
+    } catch(e) {
+        return Array.from({length:barCount},(_,i)=>0.2+0.6*Math.abs(Math.sin(i*0.71+1.3))+0.2*Math.abs(Math.sin(i*0.29)));
+    }
 }
+
+function drawWaveform(canvas, amplitudes, playProgress) {
+    const dpr=window.devicePixelRatio||1;
+    const W=canvas.clientWidth, H=canvas.clientHeight;
+    if(!W||!H) return;
+    canvas.width=W*dpr; canvas.height=H*dpr;
+    const ctx=canvas.getContext('2d');
+    ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
+    const n=amplitudes.length, gap=2;
+    const barW=Math.max(2,(W-gap*(n-1))/n);
+    const playedIdx=Math.floor(playProgress*n);
+    amplitudes.forEach((amp,i)=>{
+        const barH=Math.max(3,amp*(H-4));
+        const x=i*(barW+gap), y=(H-barH)/2;
+        ctx.fillStyle=i<playedIdx?'#ffffff':'#5865F2';
+        ctx.globalAlpha=i<playedIdx?1.0:0.55;
+        ctx.beginPath();ctx.roundRect(x,y,barW,barH,2);ctx.fill();
+    });
+    ctx.globalAlpha=1.0;
+}
+
+function createAudioPlayer(audioUrl) {
+    const BAR_COUNT=50;
+    const wrapper=document.createElement('div');
+    const card=document.createElement('div'); card.className='audio-player-card';
+    const audio=new Audio(); audio.preload='metadata';
+    const playBtn=document.createElement('button'); playBtn.className='audio-play-btn'; playBtn.innerHTML='<i class="bi bi-play-fill"></i>';
+    const canvas=document.createElement('canvas'); canvas.className='audio-waveform-canvas';
+    const timeEl=document.createElement('div'); timeEl.className='audio-time'; timeEl.textContent='0:00';
+    card.appendChild(playBtn); card.appendChild(canvas); card.appendChild(timeEl);
+    const expiresEl=document.createElement('div'); expiresEl.className='audio-expires'; expiresEl.textContent='Expires in 1 hour';
+    wrapper.appendChild(card); wrapper.appendChild(expiresEl);
+    let amplitudes=null, animFrame=null, progress=0;
+    function fmt(s){if(isNaN(s)||!isFinite(s))return'0:00';const m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec;}
+    function renderFrame(){if(!amplitudes)return;progress=audio.duration?audio.currentTime/audio.duration:0;drawWaveform(canvas,amplitudes,progress);timeEl.textContent=fmt(audio.currentTime);if(!audio.paused)animFrame=requestAnimationFrame(renderFrame);}
+    buildWaveformData(audioUrl,BAR_COUNT).then(amps=>{amplitudes=amps;drawWaveform(canvas,amplitudes,0);});
+    audio.src=audioUrl;
+    audio.addEventListener('loadedmetadata',()=>{timeEl.textContent=fmt(audio.duration);});
+    playBtn.addEventListener('click',()=>{
+        document.querySelectorAll('.audio-play-btn').forEach(b=>{if(b!==playBtn)b.innerHTML='<i class="bi bi-play-fill"></i>';});
+        document.querySelectorAll('.audio-player-card').forEach(c=>{if(c._audio&&c._audio!==audio)c._audio.pause();});
+        card._audio=audio;
+        if(audio.paused){if(sharedAudioCtx&&sharedAudioCtx.state==='suspended')sharedAudioCtx.resume();audio.play().catch(()=>{});playBtn.innerHTML='<i class="bi bi-pause-fill"></i>';animFrame=requestAnimationFrame(renderFrame);}
+        else{audio.pause();playBtn.innerHTML='<i class="bi bi-play-fill"></i>';if(animFrame)cancelAnimationFrame(animFrame);}
+    });
+    audio.addEventListener('ended',()=>{playBtn.innerHTML='<i class="bi bi-play-fill"></i>';if(animFrame)cancelAnimationFrame(animFrame);if(amplitudes)drawWaveform(canvas,amplitudes,0);timeEl.textContent='0:00';});
+    canvas.addEventListener('click',(e)=>{if(!audio.duration)return;const rect=canvas.getBoundingClientRect();const ratio=(e.clientX-rect.left)/rect.width;audio.currentTime=ratio*audio.duration;progress=ratio;if(amplitudes)drawWaveform(canvas,amplitudes,progress);timeEl.textContent=fmt(audio.currentTime);});
+    const ro=new ResizeObserver(()=>{if(amplitudes)drawWaveform(canvas,amplitudes,progress);});
+    ro.observe(canvas);
+    return wrapper;
+}
+
+// ── MESSAGES ──────────────────────────────────────────────────────────────
+function getMessageId(m){return m.id||JSON.stringify([m.timestamp,m.username,m.message,m.image_url]);}
+function isAtBottom(){return messagesContainer.scrollHeight-messagesContainer.scrollTop-messagesContainer.clientHeight<40;}
+function scrollToBottom(){messagesContainer.scrollTop=messagesContainer.scrollHeight;}
+function isMessageRecent(ts){try{return(new Date()-new Date(ts))/1000<60;}catch{return false;}}
+function notifyUser(msg){if(!("Notification" in window)||Notification.permission!=="granted")return;new Notification("New message from "+msg.username,{body:msg.message||"Sent an attachment",icon:"/static/favicon.ico"});}
 
 function appendNewMessages(messages, forceScrollBottom=false) {
-    const atBottom = isAtBottom();
-    const prevH = messagesContainer.scrollHeight;
-    let appended = false;
-    messages.forEach(message => {
-        if (!message.id) message.id = getMessageId(message);
-        if (renderedMessageIds.has(message.id)) return;
-        renderedMessageIds.add(message.id);
-        appended = true;
-        const isSent = message.username === currentUser;
-        const profilePic = message.profile_pic ? `/static/profile_pics/${message.profile_pic}` : '/static/profile_pics/default.png';
-        const row = document.createElement('div');
-        row.classList.add('discord-message');
-        if (isSent) row.classList.add('sent');
-        row.dataset.msgId = message.id;
+    const atBottom=isAtBottom(), prevH=messagesContainer.scrollHeight;
+    let appended=false;
+    messages.forEach(message=>{
+        if(!message.id) message.id=getMessageId(message);
+        if(renderedMessageIds.has(message.id)) return;
+        renderedMessageIds.add(message.id); appended=true;
+        const isSent=message.username===currentUser;
+        const profilePic=message.profile_pic?`/static/profile_pics/${message.profile_pic}`:'/static/profile_pics/default.png';
+        const row=document.createElement('div');
+        row.classList.add('discord-message'); if(isSent) row.classList.add('sent');
+        row.dataset.msgId=message.id;
+        row.addEventListener('contextmenu',e=>{e.preventDefault();showCtxMenu(e.clientX,e.clientY,message);});
+        row.addEventListener('touchstart',e=>{longPressTimer=setTimeout(()=>{const t=e.touches[0];showCtxMenu(t.clientX,t.clientY,message);},500);},{passive:true});
+        row.addEventListener('touchend',()=>{if(longPressTimer)clearTimeout(longPressTimer);});
+        row.addEventListener('touchmove',()=>{if(longPressTimer)clearTimeout(longPressTimer);});
 
-        row.addEventListener('contextmenu', e => { e.preventDefault(); showCtxMenu(e.clientX, e.clientY, message); });
-        row.addEventListener('touchstart', e => {
-            longPressTimer = setTimeout(() => {
-                const t = e.touches[0];
-                showCtxMenu(t.clientX, t.clientY, message);
-            }, 500);
-        }, {passive:true});
-        row.addEventListener('touchend', () => { if(longPressTimer) clearTimeout(longPressTimer); });
-        row.addEventListener('touchmove', () => { if(longPressTimer) clearTimeout(longPressTimer); });
+        // Avatar with status dot
+        const avatarWrap=document.createElement('div'); avatarWrap.className='avatar-wrap';
+        const avatar=document.createElement('img'); avatar.className='discord-avatar'; avatar.src=profilePic; avatar.alt='avatar';
+        avatar.onerror=()=>{avatar.src='/static/profile_pics/default.png';};
+        // We'll set status from membersData if available
+        const senderStatus=(membersData.find(m=>m.username===message.username)||{}).status||'offline';
+        const dot=document.createElement('span'); dot.className=`status-dot ${senderStatus}`; dot.dataset.username=message.username;
+        avatarWrap.appendChild(avatar); avatarWrap.appendChild(dot);
 
-        const avatar = document.createElement('img');
-        avatar.className='discord-avatar'; avatar.src=profilePic; avatar.alt='avatar';
-        avatar.onerror=()=>{ avatar.src='/static/profile_pics/default.png'; };
-
-        const bubble = document.createElement('div');
-        bubble.className='discord-bubble';
-        if (message.highlight) bubble.classList.add('mention-highlight-bubble');
-
-        const header = document.createElement('div');
-        header.className='discord-header';
-        const uname = document.createElement('span');
-        uname.className='discord-username'; uname.textContent=message.username;
-        header.appendChild(uname);
-        if (isSent) {
-            const you = document.createElement('span');
-            you.className='discord-you'; you.textContent='(You)';
-            header.appendChild(you);
-        }
-        const ts = document.createElement('span');
-        ts.className='discord-timestamp'; ts.textContent=formatSydneyTime(message.timestamp);
-        header.appendChild(ts);
-
-        const content = document.createElement('div');
-        content.className='discord-content';
-        if (message.reply_to) {
-            const rd = document.createElement('div');
-            rd.className='reply-context';
-            rd.innerHTML=`<strong>${message.reply_to.username}</strong>: <span style="color:#b9bbbe">${message.reply_to.preview||'[Image]'}</span>`;
-            content.appendChild(rd);
-        }
-        if (message.image_url) {
-            const img = document.createElement('img');
-            img.className='chat-image'; img.src=message.image_url; img.alt='sent image';
-            img.onclick=()=>showFullscreenImage(message.image_url);
-            content.appendChild(img);
-        }
-        if (message.message) {
-            if (message.image_url) content.appendChild(document.createElement('br'));
-            const txt = document.createElement('span');
-            txt.textContent = message.message;
-            content.appendChild(txt);
-        }
+        const bubble=document.createElement('div'); bubble.className='discord-bubble';
+        if(message.highlight) bubble.classList.add('mention-highlight-bubble');
+        const header=document.createElement('div'); header.className='discord-header';
+        const uname=document.createElement('span'); uname.className='discord-username'; uname.textContent=message.username; header.appendChild(uname);
+        if(isSent){const you=document.createElement('span'); you.className='discord-you'; you.textContent='(You)'; header.appendChild(you);}
+        const ts=document.createElement('span'); ts.className='discord-timestamp'; ts.textContent=formatSydneyTime(message.timestamp); header.appendChild(ts);
+        const content=document.createElement('div'); content.className='discord-content';
+        if(message.reply_to){const rd=document.createElement('div');rd.className='reply-context';rd.innerHTML=`<strong>${message.reply_to.username}</strong>: <span style="color:#b9bbbe">${message.reply_to.preview||'[Attachment]'}</span>`;content.appendChild(rd);}
+        if(message.image_url){const img=document.createElement('img');img.className='chat-image';img.src=message.image_url;img.alt='sent image';img.onclick=()=>showFullscreenImage(message.image_url);content.appendChild(img);}
+        if(message.file_url){const fc=document.createElement('a');fc.className='file-card';fc.href=message.file_url;fc.target='_blank';fc.rel='noopener';const ic=document.createElement('i');ic.className='bi file-card-icon '+getFileIconClass(message.file_name);const inf=document.createElement('div');inf.className='file-card-info';const nm=document.createElement('div');nm.className='file-card-name';nm.textContent=message.file_name||'File';nm.title=message.file_name||'File';const sz=document.createElement('div');sz.className='file-card-size';sz.textContent=formatFileSize(message.file_size);const ex=document.createElement('div');ex.className='file-card-expires';ex.innerHTML='<i class="bi bi-clock"></i> Expires in 1 hour · Click to download';inf.appendChild(nm);inf.appendChild(sz);inf.appendChild(ex);fc.appendChild(ic);fc.appendChild(inf);content.appendChild(fc);}
+        if(message.audio_url){content.appendChild(createAudioPlayer(message.audio_url));}
+        if(message.message){if(message.image_url||message.file_url||message.audio_url)content.appendChild(document.createElement('br'));const txt=document.createElement('span');txt.textContent=message.message;content.appendChild(txt);}
         bubble.appendChild(header); bubble.appendChild(content);
-        row.appendChild(avatar); row.appendChild(bubble);
+        row.appendChild(avatarWrap); row.appendChild(bubble);
         messagesContainer.appendChild(row);
+        const isMentioned=message.mentions&&(message.mentions.includes('everyone')||message.mentions.includes(currentUser));
+        if(message.username!==currentUser&&isMessageRecent(message.timestamp)&&(isMentioned||document.cookie.includes('notifications_enabled=1'))){Notification.permission==='granted'?notifyUser(message):Notification.permission!=='denied'&&Notification.requestPermission().then(p=>p==='granted'&&notifyUser(message));}
+    });
+    if(appended&&!atBottom&&!forceScrollBottom) newMessageIndicator.style.display='block';
+    if(forceScrollBottom||(atBottom&&appended)){scrollToBottom();newMessageIndicator.style.display='none';}
+    else if(appended){messagesContainer.scrollTop+=(messagesContainer.scrollHeight-prevH);}
+}
 
-        const isMentioned = message.mentions && (message.mentions.includes('everyone')||message.mentions.includes(currentUser));
-        if (message.username!==currentUser && isMessageRecent(message.timestamp) && (isMentioned||document.cookie.includes('notifications_enabled=1'))) {
-            Notification.permission==='granted' ? notifyUser(message) :
-            Notification.permission!=='denied' && Notification.requestPermission().then(p=>p==='granted'&&notifyUser(message));
+// Live-update status dots in already-rendered messages
+function updateStatusDots() {
+    document.querySelectorAll('[data-username]').forEach(dot => {
+        const uname = dot.dataset.username;
+        const found = membersData.find(m => m.username === uname);
+        if (found) {
+            dot.className = `status-dot ${found.status}`;
         }
     });
-    if (appended && !atBottom && !forceScrollBottom) newMessageIndicator.style.display='block';
-    if (forceScrollBottom||(atBottom&&appended)) { scrollToBottom(); newMessageIndicator.style.display='none'; }
-    else if (appended) { messagesContainer.scrollTop += (messagesContainer.scrollHeight - prevH); }
 }
+// Hook into fetchMembers to also update dots
+const _origFetchMembers = fetchMembers;
 
-function formatSydneyTime(utcTimestamp) {
-    const DateTime = luxon.DateTime;
-    const dt = DateTime.fromISO(utcTimestamp,{zone:'utc'}).setZone('Australia/Sydney');
-    const now = DateTime.now().setZone('Australia/Sydney');
-    const t = dt.toFormat('hh:mm:ss a');
-    return dt.hasSame(now,'day') ? `Today at ${t} ${dt.offsetNameShort}` : `${dt.toFormat('yyyy-MM-dd')} ${t} ${dt.offsetNameShort}`;
-}
+function formatSydneyTime(utcTimestamp){const DateTime=luxon.DateTime;const dt=DateTime.fromISO(utcTimestamp,{zone:'utc'}).setZone('Australia/Sydney');const now=DateTime.now().setZone('Australia/Sydney');const t=dt.toFormat('hh:mm:ss a');return dt.hasSame(now,'day')?`Today at ${t} ${dt.offsetNameShort}`:`${dt.toFormat('yyyy-MM-dd')} ${t} ${dt.offsetNameShort}`;}
 
-function fetchMessages(forceScrollBottom=false) {
-    fetch(`/messages/${key}`).then(r=>r.json()).then(data=>{ if(data.messages) appendNewMessages(data.messages,forceScrollBottom); }).catch(()=>{});
-}
+function fetchMessages(forceScrollBottom=false){fetch(`/messages/${key}`).then(r=>r.json()).then(data=>{if(data.messages) appendNewMessages(data.messages,forceScrollBottom);}).catch(()=>{});}
 messagesContainer.innerHTML=''; fetchMessages(true);
-
-// Poll messages every 4s instead of 3s
 setInterval(fetchMessages, 4000);
 
-document.getElementById('sendMessageForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    const inp = document.getElementById('messageInput');
-    if (!inp.value.trim()) return;
-    const body = {message: inp.value};
-    if (replyToMessage && replyToMessage.id) body.reply_to = {id:replyToMessage.id, username:replyToMessage.username, preview:(replyToMessage.message||'[Image]').slice(0,64)};
-    const r = await fetch(`/chat_room/${key}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if (r.ok) { inp.value=''; hideReplyBar(); stopTyping(); fetchMessages(true); }
-});
-
-function uploadImage(event, groupCode) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const fd = new FormData(); fd.append('image', file);
-    fetch(`/IMAGES/${groupCode}/`, {method:'POST',body:fd}).then(r=>r.json()).then(data=>{
-        if (data && data.image_url) {
-            const body = {message:'', image_url:data.image_url};
-            if (replyToMessage&&replyToMessage.id) body.reply_to={id:replyToMessage.id, username:replyToMessage.username, preview:(replyToMessage.message||'[Image]').slice(0,64)};
-            fetch(`/chat_room/${groupCode}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-                .then(()=>{ hideReplyBar(); fetchMessages(true); });
-        } else alert('Photo upload failed.');
-    }).catch(()=>alert('Photo upload failed.'));
-    event.target.value='';
-}
-
-newMessageIndicator.addEventListener('click', function(){ scrollToBottom(); this.style.display='none'; });
-messagesContainer.addEventListener('scroll', ()=>{ if(isAtBottom()) newMessageIndicator.style.display='none'; });
-
-function showFullscreenImage(src) {
-    document.getElementById('fullscreenImage').src=src;
-    document.getElementById('fullscreenImageModal').style.display='flex';
-    document.body.style.overflow='hidden';
-}
-function closeFullscreenImage() {
-    document.getElementById('fullscreenImageModal').style.display='none';
-    document.body.style.overflow='';
-}
-document.getElementById('fullscreenImageModal').addEventListener('click', function(e){ if(e.target===this) closeFullscreenImage(); });
-
-// Check timeout every 15s instead of 3s
+// Also refresh member statuses + dots every 10s
 setInterval(()=>{
-    fetch('/check_timeout').then(r=>r.json()).then(d=>{ if(d.timed_out) window.location.href='/chat'; }).catch(()=>{});
-}, 15000);
+    fetch(`/get_group_members/${key}`).then(r=>r.json()).then(d=>{
+        membersData=d.members||[];
+        document.getElementById('memberCount').textContent=membersData.length;
+        if(membersOpen) renderMembers(membersData);
+        updateStatusDots();
+    }).catch(()=>{});
+}, 10000);
 
-document.addEventListener('DOMContentLoaded', ()=>{
-    if ("Notification" in window && Notification.permission!=="granted" && Notification.permission!=="denied") Notification.requestPermission();
+document.getElementById('sendMessageForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const inp=document.getElementById('messageInput');
+    if(!inp.value.trim()) return;
+    const body={message:inp.value};
+    if(replyToMessage&&replyToMessage.id) body.reply_to={id:replyToMessage.id,username:replyToMessage.username,preview:(replyToMessage.message||'[Attachment]').slice(0,64)};
+    const r=await fetch(`/chat_room/${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(r.ok){inp.value='';hideReplyBar();stopTyping();fetchMessages(true);}
 });
+
+function uploadImage(event,groupCode){const file=event.target.files[0];if(!file)return;showUploadOverlay('Uploading photo...');const fd=new FormData();fd.append('image',file);fetch(`/IMAGES/${groupCode}/`,{method:'POST',body:fd}).then(r=>r.json()).then(data=>{hideUploadOverlay();if(data&&data.image_url){const body={message:'',image_url:data.image_url};if(replyToMessage&&replyToMessage.id)body.reply_to={id:replyToMessage.id,username:replyToMessage.username,preview:'[Image]'};fetch(`/chat_room/${groupCode}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(()=>{hideReplyBar();fetchMessages(true);});}else alert('Photo upload failed.');}).catch(()=>{hideUploadOverlay();alert('Photo upload failed.');});event.target.value='';}
+function uploadFile(event,groupCode){const file=event.target.files[0];if(!file)return;if(file.size>25*1024*1024){alert('File too large. Maximum size is 25MB.');event.target.value='';return;}showUploadOverlay('Uploading file...');const fd=new FormData();fd.append('file',file);fetch(`/upload_file/${groupCode}`,{method:'POST',body:fd}).then(r=>r.json()).then(data=>{hideUploadOverlay();if(data&&data.file_url){const body={message:'',file_url:data.file_url,file_name:data.file_name,file_size:data.file_size};if(replyToMessage&&replyToMessage.id)body.reply_to={id:replyToMessage.id,username:replyToMessage.username,preview:'[File]'};fetch(`/chat_room/${groupCode}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(()=>{hideReplyBar();fetchMessages(true);});}else alert('File upload failed: '+(data.error||'Unknown error'));}).catch(()=>{hideUploadOverlay();alert('File upload failed.');});event.target.value='';}
+function uploadAudio(event,groupCode){const file=event.target.files[0];if(!file)return;if(file.size>25*1024*1024){alert('Audio file too large. Maximum size is 25MB.');event.target.value='';return;}showUploadOverlay('Uploading audio...');const fd=new FormData();fd.append('audio',file);fetch(`/upload_audio/${groupCode}`,{method:'POST',body:fd}).then(r=>r.json()).then(data=>{hideUploadOverlay();if(data&&data.audio_url){const body={message:'',audio_url:data.audio_url};if(replyToMessage&&replyToMessage.id)body.reply_to={id:replyToMessage.id,username:replyToMessage.username,preview:'[Audio]'};fetch(`/chat_room/${groupCode}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(()=>{hideReplyBar();fetchMessages(true);});}else alert('Audio upload failed: '+(data.error||'Unknown error'));}).catch(()=>{hideUploadOverlay();alert('Audio upload failed.');});event.target.value='';}
+
+newMessageIndicator.addEventListener('click',function(){scrollToBottom();this.style.display='none';});
+messagesContainer.addEventListener('scroll',()=>{if(isAtBottom())newMessageIndicator.style.display='none';});
+function showFullscreenImage(src){document.getElementById('fullscreenImage').src=src;document.getElementById('fullscreenImageModal').style.display='flex';document.body.style.overflow='hidden';}
+function closeFullscreenImage(){document.getElementById('fullscreenImageModal').style.display='none';document.body.style.overflow='';}
+document.getElementById('fullscreenImageModal').addEventListener('click',function(e){if(e.target===this)closeFullscreenImage();});
+setInterval(()=>{fetch('/check_timeout').then(r=>r.json()).then(d=>{if(d.timed_out)window.location.href='/chat';}).catch(()=>{});},15000);
+document.addEventListener('DOMContentLoaded',()=>{if("Notification" in window&&Notification.permission!=="granted"&&Notification.permission!=="denied")Notification.requestPermission();});
 </script>
 {% endblock %}

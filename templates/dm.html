@@ -1,0 +1,369 @@
+{% extends "layout.html" %}
+{% block title %}Direct Messages{% endblock %}
+
+{% block main %}
+<div class="dm-layout">
+    <div class="dm-sidebar" id="dmSidebar">
+        <div class="dm-sidebar-header">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-chat-dots-fill"></i> 
+                <span>Direct Messages</span>
+            </div>
+        </div>
+        
+        <div class="dm-list">
+            {% for convo in conversations %}
+            <a href="/dm/{{ convo.username }}" class="dm-user-btn {% if active_user == convo.username %}active{% endif %}">
+                <img src="/static/profile_pics/{{ convo.profile_pic }}" alt="avatar" class="dm-user-avatar"
+                     onerror="this.src='/static/profile_pics/default.png'">
+                <div class="dm-user-info">
+                    <span class="dm-username">{{ convo.username }}</span>
+                    {% if convo.unread %}
+                    <span class="dm-unread-badge">{{ convo.unread }}</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+            {% if not conversations %}
+            <p class="dm-empty">No conversations yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="dm-new-area">
+            <input type="text" id="newDmInput" class="form-control dm-new-input" placeholder="Start a DM...">
+            <button class="btn btn-primary btn-sm w-100 mt-2" onclick="startNewDm()">
+                <i class="bi bi-plus-lg"></i> New DM
+            </button>
+        </div>
+    </div>
+
+    <div class="dm-chat-area">
+        {% if active_user %}
+        <div class="dm-chat-header">
+            <button class="dm-mobile-toggle" onclick="toggleSidebar(true)">
+                <i class="bi bi-list"></i>
+            </button>
+            
+            <img src="/static/profile_pics/{{ active_profile_pic }}" class="dm-user-avatar" alt="avatar"
+                 onerror="this.src='/static/profile_pics/default.png'">
+            <span class="dm-chat-username">{{ active_user }}</span>
+        </div>
+
+        <div id="dmMessages" class="message-box dm-message-box"></div>
+
+        <div id="dmReplyBar" class="dm-reply-bar">
+            <span id="dmReplyPreview"></span>
+            <button onclick="hideDmReply()" class="dm-reply-close">&times;</button>
+        </div>
+
+        <div class="dm-input-row">
+            <form id="dmSendForm" class="d-flex w-100" style="gap:8px;">
+                <input type="text" id="dmMsgInput" class="form-control" placeholder="Message {{ active_user }}..." autocomplete="off">
+                <button class="btn btn-primary" type="submit">Send</button>
+            </form>
+        </div>
+        <div id="dmTypingIndicator" class="typing-indicator-outer"></div>
+        
+        {% else %}
+        <div class="dm-no-convo">
+            <button class="dm-mobile-toggle start-page-toggle" onclick="toggleSidebar(true)">
+                <i class="bi bi-list"></i>
+            </button>
+            <i class="bi bi-chat-dots" style="font-size:3rem; opacity: 0.3;"></i>
+            <p>Select a conversation to start chatting.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div id="dmCtxMenu" class="dm-context-menu">
+    <div class="ctx-item" id="dmCtxReply"><i class="bi bi-reply-fill"></i> Reply</div>
+    <div class="ctx-item" id="dmCtxCopy"><i class="bi bi-clipboard"></i> Copy Text</div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item ctx-danger" id="dmCtxDelete" style="display:none;"><i class="bi bi-trash-fill"></i> Delete Message</div>
+</div>
+
+<style>
+/* --- THEME SYSTEM (Targeting body or layout) --- */
+/* Default/Dark */
+[data-theme="dark"] .dm-layout,
+.dm-layout {
+    --bg-side: #2b2d31;
+    --bg-chat: #313338;
+    --bg-input: #383a40;
+    --bg-hover: #3f4147;
+    --text-main: #f2f3f5;
+    --text-muted: #b9bbbe;
+    --border: #1e1f22;
+    --accent: #5865f2;
+}
+
+[data-theme="light"] .dm-layout {
+    --bg-side: #f2f3f5;
+    --bg-chat: #ffffff;
+    --bg-input: #ebedef;
+    --bg-hover: #e3e5e8;
+    --text-main: #060607;
+    --text-muted: #4e5058;
+    --border: #dcdfe3;
+    --accent: #5865f2;
+}
+
+[data-theme="yellow"] .dm-layout {
+    --bg-side: #fbc02d;
+    --bg-chat: #fffde7;
+    --bg-input: #ffffff;
+    --bg-hover: #fff9c4;
+    --text-main: #424242;
+    --text-muted: #616161;
+    --border: #f9a825;
+    --accent: #e65100;
+}
+
+/* --- LAYOUT --- */
+html, body { height:100%; margin:0; overflow:hidden; }
+
+.dm-layout { 
+    display:flex; 
+    height:calc(100vh - var(--navbar-height,56px)); 
+    background: var(--bg-chat);
+    color: var(--text-main);
+    transition: background 0.2s ease;
+}
+
+/* Sidebar Drawer */
+.dm-sidebar { 
+    width:260px; 
+    background: var(--bg-side); 
+    border-right:1px solid var(--border); 
+    display:flex; 
+    flex-direction:column; 
+    z-index: 1001;
+    transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.dm-sidebar-header { 
+    padding:16px; 
+    font-weight:700; 
+    color: var(--text-main); 
+    border-bottom:1px solid var(--border);
+}
+
+.dm-list { flex:1; overflow-y:auto; padding:8px; }
+.dm-user-btn { 
+    display:flex; align-items:center; gap:12px; padding:10px; border-radius:8px; 
+    color: var(--text-muted); text-decoration:none; margin-bottom:4px; 
+}
+.dm-user-btn:hover, .dm-user-btn.active { background: var(--bg-hover); color: var(--text-main); }
+.dm-user-avatar { width:36px; height:36px; border-radius:50%; object-fit:cover; }
+
+.dm-new-area { padding:12px; border-top:1px solid var(--border); }
+.dm-new-input { background: var(--bg-input) !important; color: var(--text-main) !important; border: none; }
+
+/* Chat Area */
+.dm-chat-area { flex:1; display:flex; flex-direction:column; min-width:0; background: var(--bg-chat); }
+.dm-chat-header { 
+    padding:12px 16px; border-bottom:1px solid var(--border); 
+    display:flex; align-items:center; gap:12px; color: var(--text-main); 
+}
+
+.dm-mobile-toggle { 
+    display: none; background: none; border: none; 
+    color: var(--text-main); font-size: 1.5rem; padding: 0;
+}
+
+.dm-message-box { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
+
+.dm-reply-bar { 
+    display:none; background: var(--bg-input); color: var(--text-main); 
+    padding:8px 16px; border-left:4px solid var(--accent); position:relative; 
+}
+.dm-reply-close { position:absolute; right:10px; top:4px; background:none; border:none; color: var(--text-muted); font-size:20px; }
+
+.dm-input-row { padding:12px 20px; background: var(--bg-chat); }
+.dm-input-row .form-control { background: var(--bg-input); color: var(--text-main); border: none; height: 44px; }
+
+/* Messages */
+.discord-message { display:flex; gap:14px; padding:4px 0; }
+.discord-username { font-weight: 600; color: var(--accent); margin-right: 8px; }
+.discord-timestamp { font-size: 0.75rem; color: var(--text-muted); }
+.discord-content { color: var(--text-main); font-size: 0.95rem; margin-top: 2px; }
+
+/* Mobile Logic */
+@media (max-width: 768px) {
+    .dm-sidebar {
+        position: fixed; left: 0; top: var(--navbar-height, 56px); bottom: 0;
+        transform: translateX(-100%);
+    }
+    .dm-sidebar.open { transform: translateX(0); }
+    .dm-mobile-toggle { display: block; }
+    .dm-no-convo { position: relative; padding: 20px; text-align: center; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .start-page-toggle { position: absolute; top: 15px; left: 15px; }
+}
+
+/* Context Menu */
+.dm-context-menu {
+    display:none; position:fixed; z-index:9999; background: var(--bg-side); 
+    border:1px solid var(--border); border-radius:8px; padding:6px 0; min-width:180px; box-shadow:0 8px 24px rgba(0,0,0,0.3);
+}
+.ctx-item { padding:10px 15px; color: var(--text-main); cursor:pointer; display:flex; align-items:center; gap:10px; }
+.ctx-item:hover { background: var(--bg-hover); }
+.ctx-danger { color:#ed4245 !important; }
+</style>
+
+<script>
+const currentUser = "{{ current_user.username }}";
+const activeUser = "{{ active_user or '' }}";
+let dmRenderedIds = new Set();
+let dmReplyTo = null;
+
+// Mobile Sidebar Toggle
+function toggleSidebar(show) {
+    const sidebar = document.getElementById('dmSidebar');
+    if (show) {
+        sidebar.classList.add('open');
+        const backdrop = document.createElement('div');
+        backdrop.id = 'sidebarBackdrop';
+        backdrop.style = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:1000;";
+        backdrop.onclick = () => toggleSidebar(false);
+        document.body.appendChild(backdrop);
+    } else {
+        sidebar.classList.remove('open');
+        const b = document.getElementById('sidebarBackdrop');
+        if (b) b.remove();
+    }
+}
+
+// Close sidebar on mobile when clicking a user
+document.querySelectorAll('.dm-user-btn').forEach(btn => {
+    btn.addEventListener('click', () => { if(window.innerWidth <= 768) toggleSidebar(false); });
+});
+
+// Context Menu Logic
+const dmCtxMenu = document.getElementById('dmCtxMenu');
+let dmCtxTarget = null;
+
+function showDmCtxMenu(x, y, msg) {
+    dmCtxTarget = msg;
+    document.getElementById('dmCtxDelete').style.display = (msg.username === currentUser) ? 'flex' : 'none';
+    dmCtxMenu.style.display = 'block';
+    
+    const menuWidth = 180;
+    const menuHeight = 150;
+    dmCtxMenu.style.left = (x + menuWidth > window.innerWidth ? x - menuWidth : x) + 'px';
+    dmCtxMenu.style.top = (y + menuHeight > window.innerHeight ? y - menuHeight : y) + 'px';
+}
+
+document.addEventListener('click', () => dmCtxMenu.style.display = 'none');
+
+document.getElementById('dmCtxReply').onclick = () => { if(dmCtxTarget) showDmReply(dmCtxTarget); };
+document.getElementById('dmCtxCopy').onclick = () => {
+    if(dmCtxTarget) navigator.clipboard.writeText(dmCtxTarget.message || '');
+};
+
+document.getElementById('dmCtxDelete').onclick = () => {
+    if (dmCtxTarget && dmCtxTarget.username === currentUser && confirm('Delete message?')) {
+        fetch(`/delete_dm/${dmCtxTarget.id}`, {method:'POST'})
+            .then(() => {
+                dmRenderedIds.clear();
+                document.getElementById('dmMessages').innerHTML = '';
+                fetchDmMessages();
+            });
+    }
+};
+
+// Reply Logic
+function showDmReply(msg) {
+    dmReplyTo = msg;
+    document.getElementById('dmReplyBar').style.display = 'block';
+    document.getElementById('dmReplyPreview').textContent = `Replying to ${msg.username}`;
+    document.getElementById('dmMsgInput').focus();
+}
+
+function hideDmReply() {
+    dmReplyTo = null;
+    document.getElementById('dmReplyBar').style.display = 'none';
+}
+
+// Messaging Logic
+const dmMessages = document.getElementById('dmMessages');
+
+function appendDmMessages(messages) {
+    if (!dmMessages) return;
+    const isAtBottom = dmMessages.scrollHeight - dmMessages.scrollTop - dmMessages.clientHeight < 50;
+
+    messages.forEach(msg => {
+        if (dmRenderedIds.has(msg.id)) return;
+        dmRenderedIds.add(msg.id);
+
+        const row = document.createElement('div');
+        row.className = 'discord-message';
+        row.oncontextmenu = (e) => { e.preventDefault(); showDmCtxMenu(e.clientX, e.clientY, msg); };
+
+        row.innerHTML = `
+            <img src="/static/profile_pics/${msg.profile_pic || 'default.png'}" class="dm-user-avatar" onerror="this.src='/static/profile_pics/default.png'">
+            <div class="discord-bubble">
+                <div class="discord-header">
+                    <span class="discord-username">${msg.username}</span>
+                    <span class="discord-timestamp">${msg.timestamp}</span>
+                </div>
+                ${msg.reply_to ? `<div style="font-size:0.8rem; opacity:0.6; border-left:2px solid gray; padding-left:8px; margin-bottom:4px;">Replying to ${msg.reply_to.username}</div>` : ''}
+                <div class="discord-content">${msg.message}</div>
+            </div>
+        `;
+        dmMessages.appendChild(row);
+    });
+
+    if (isAtBottom) dmMessages.scrollTop = dmMessages.scrollHeight;
+}
+
+function fetchDmMessages() {
+    if (!activeUser) return;
+    fetch(`/dm_messages/${activeUser}`).then(r => r.json()).then(d => {
+        if (d.messages) appendDmMessages(d.messages);
+    });
+}
+
+const dmSendForm = document.getElementById('dmSendForm');
+if (dmSendForm) {
+    dmSendForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const inp = document.getElementById('dmMsgInput');
+        if (!inp.value.trim()) return;
+
+        const body = { to: activeUser, message: inp.value };
+        if (dmReplyTo) body.reply_to = { id: dmReplyTo.id, username: dmReplyTo.username };
+
+        const r = await fetch('/send_dm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (r.ok) {
+            inp.value = '';
+            hideDmReply();
+            fetchDmMessages();
+        }
+    };
+}
+
+if (activeUser) {
+    fetchDmMessages();
+    setInterval(fetchDmMessages, 3000);
+}
+
+function startNewDm() {
+    const val = document.getElementById('newDmInput').value.trim();
+    if(val) window.location.href = `/dm/${val}`;
+}
+
+// Adjust layout height for navbars
+function setHeight() {
+    const nav = document.querySelector('.navbar');
+    if (nav) document.documentElement.style.setProperty('--navbar-height', nav.offsetHeight + 'px');
+}
+window.onload = setHeight;
+window.onresize = setHeight;
+</script>
+{% endblock %}

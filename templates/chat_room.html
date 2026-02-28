@@ -3,268 +3,126 @@
 
 {% block main %}
 <div class="container chat-container">
-    <div class="d-flex justify-content-between align-items-center" style="padding: 1rem;">
-        <h3 class="mb-0">Group Code: {{ key }}</h3>
+    <div class="d-flex justify-content-between align-items-center chat-header">
+        <h3 class="mb-0">Group: <span style="color:#5865F2;">{{ key }}</span></h3>
+        <a href="/dm" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chat-dots"></i> DMs</a>
     </div>
     <div class="chat-window" style="position: relative; flex: 1 1 0; display: flex; flex-direction: column; min-height: 0;">
-        <!-- Reply bar -->
-        <div id="replyBar" style="display:none; background:#222; color:#fff; border-radius:6px 6px 0 0; padding:8px 12px 8px 24px; margin-bottom:-2px; position:relative;">
-            <span id="replyPreview"></span>
-            <button id="cancelReplyBtn" style="position:absolute;right:12px;top:8px;background:transparent;border:none;color:#fff;font-size:18px;">&times;</button>
+        <div id="replyBar" style="display:none; background:#2a2d31; color:#fff; border-radius:6px 6px 0 0; padding:8px 12px 8px 24px; margin-bottom:-2px; position:relative; border-left: 3px solid #5865F2;">
+            <span id="replyPreview" style="font-size:13px;"></span>
+            <button id="cancelReplyBtn" style="position:absolute;right:12px;top:8px;background:transparent;border:none;color:#aaa;font-size:18px;">&times;</button>
         </div>
         <div id="messages" class="message-box border rounded p-3"></div>
         <button id="newMessageIndicator" title="New messages below"
             style="display:none; position: absolute; right: -52px; bottom: 24px; z-index: 10; background: transparent; border: none; box-shadow: none;">
-            <span class="fs-2 text-danger">
-                <i class="bi bi-exclamation-circle-fill"></i>
-            </span>
+            <span class="fs-2 text-danger"><i class="bi bi-exclamation-circle-fill"></i></span>
         </button>
-        <div class="d-flex align-items-center mt-3" style="padding: 0.75rem;">
-            <button type="button" class="btn btn-success plus-btn mr-2"
+        <div class="d-flex align-items-center input-row">
+            <button type="button" class="btn btn-success plus-btn"
                 title="Add Photo"
                 onclick="document.getElementById('imageInput').click();"
-                style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; font-size: 22px;">
+                style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;font-size:22px;flex-shrink:0;">
                 <span style="font-size:28px;line-height:0;">&#43;</span>
             </button>
-            <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="uploadImage(event, '{{ key }}')">
-            <form id="sendMessageForm" class="flex-grow-1 d-flex" method="POST">
+            <input type="file" id="imageInput" accept="image/*" style="display:none;" onchange="uploadImage(event,'{{ key }}')">
+            <form id="sendMessageForm" class="flex-grow-1 d-flex" method="POST" style="gap:8px;">
                 <input type="text" name="message" id="messageInput" class="form-control" placeholder="Type message" autocomplete="off">
-                <button class="btn btn-primary ml-2" type="submit">Send</button>
+                <button class="btn btn-primary" type="submit" style="flex-shrink:0;">Send</button>
             </form>
         </div>
-        <!-- Typing indicator is now directly below the input box, less padding above -->
         <div id="typingIndicator" class="typing-indicator-outer"></div>
     </div>
-    <div id="fullscreenImageModal" style="display:none; position:fixed; z-index:20000; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); align-items:center; justify-content:center;">
-        <img id="fullscreenImage" src="" alt="Full size" style="max-width:90vw; max-height:90vh; border-radius:16px; box-shadow:0 2px 32px #222;" />
-        <button onclick="closeFullscreenImage()" style="position:absolute; top:32px; right:40px; font-size:2rem; background:transparent; border:none; color:white; z-index:20001;">&times;</button>
+    <div id="fullscreenImageModal" style="display:none;position:fixed;z-index:20000;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;">
+        <img id="fullscreenImage" src="" alt="Full size" style="max-width:90vw;max-height:90vh;border-radius:16px;box-shadow:0 2px 32px #222;" />
+        <button onclick="closeFullscreenImage()" style="position:absolute;top:32px;right:40px;font-size:2rem;background:transparent;border:none;color:white;z-index:20001;">&times;</button>
+    </div>
+</div>
+
+<!-- Right-click / Long-press Context Menu -->
+<div id="ctxMenu" style="display:none;position:fixed;z-index:99999;background:#2b2d31;border:1px solid #3f4147;border-radius:8px;padding:6px 0;min-width:185px;box-shadow:0 8px 32px #0009;">
+    <div class="ctx-item" id="ctxReply"><i class="bi bi-reply-fill"></i> Reply</div>
+    <div class="ctx-item" id="ctxCopy"><i class="bi bi-clipboard"></i> Copy Text</div>
+    <div class="ctx-item" id="ctxForward"><i class="bi bi-send-fill"></i> Forward to DM</div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item ctx-danger" id="ctxDelete" style="display:none;"><i class="bi bi-trash-fill"></i> Delete Message</div>
+</div>
+
+<!-- Forward to DM Modal -->
+<div id="dmModal" style="display:none;position:fixed;z-index:100000;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
+    <div style="background:#2b2d31;border-radius:12px;padding:28px 24px;min-width:300px;max-width:400px;width:90%;box-shadow:0 8px 40px #0009;">
+        <h5 style="color:#fff;margin-bottom:16px;"><i class="bi bi-send-fill"></i> Forward to DM</h5>
+        <p style="color:#b9bbbe;font-size:13px;">Select a user to forward this message to:</p>
+        <select id="dmUserSelect" class="form-select mb-3" style="background:#1e1f22;color:#fff;border:1px solid #3f4147;"></select>
+        <div style="display:flex;gap:10px;">
+            <button id="dmSendBtn" class="btn btn-primary" style="flex:1;">Send</button>
+            <button onclick="closeDmModal()" class="btn btn-secondary" style="flex:1;">Cancel</button>
+        </div>
     </div>
 </div>
 
 <style>
-html, body {
-    height: 100%;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    overflow: hidden; /* Prevent window (page) scrolling */
-}
-.mention-highlight-bubble {
-    background: #f9e69b !important;                   /* Discord yellow highlight */
-    border-left: 4px solid #f8d363;                   /* Discord-style border */
-    box-shadow: 0 0 8px #f8d36333;
-    border-radius: 8px;
-    color: #23272a !important;                        /* Discord's readable dark text */
-    transition: background 0.18s, box-shadow 0.18s;
-    position: relative;
-    font-weight: 500;
-}
-.mention-highlight-bubble .discord-content,
-.mention-highlight-bubble .reply-context,
-.mention-highlight-bubble .discord-timestamp,
-.mention-highlight-bubble .discord-username,
-.mention-highlight-bubble .discord-you {
-    color: #23272a !important; /* Ensure all text is readable! */
-}
-.mention-highlight-bubble:hover {
-    background: #fae27a !important;
-    box-shadow: 0 0 16px 2px #f8d36377;
-}
+html, body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; }
+.chat-header { padding:0.5rem 1rem; }
 .chat-container {
-    height: calc(100vh - var(--navbar-height, 56px) - 16px);
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-    margin: 0;
-    max-width: 100vw;
-    padding-left: 10px; 
-    padding-right: 10px;
+    height: calc(100vh - var(--navbar-height, 56px) - 12px);
+    display:flex; flex-direction:column; padding:0; margin:0; max-width:100vw;
+    padding-left:10px; padding-right:10px;
 }
-
-.chat-window {
-    flex: 1 1 0;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    height: 100%;
-    margin-top: 0;
-    margin-bottom: 0;
-}
-
+.chat-window { flex:1 1 0; display:flex; flex-direction:column; min-height:0; height:100%; }
 .message-box {
-    flex: 1 1 0;
-    min-height: 0;
-    overflow-y: auto;
-    border: 1px solid #ccc;
-    padding: 15px;
-    border-radius: 10px;
-    background: #23272a;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    flex:1 1 0; min-height:0; overflow-y:auto; border:1px solid #ccc;
+    padding:15px; border-radius:10px; background:#23272a;
+    display:flex; flex-direction:column; gap:10px;
 }
-
-.d-flex.align-items-center.mt-3 {
-    margin-top: 0 !important;
-    padding-top: 8px;
-    padding-bottom: 8px;
-}
-
+.input-row { margin-top:0 !important; padding:6px 0 2px 0; gap:8px; }
 .discord-message {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 7px;
-    padding-right: 10px;
-    cursor: pointer;
-    user-select: text;
-    position: relative;
+    display:flex; align-items:flex-start; gap:10px; padding:4px 8px 4px 4px;
+    cursor:default; user-select:text; position:relative; border-radius:6px;
+    transition:background 0.1s;
 }
-.discord-avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    object-fit: cover;
-    background: #2f3136;
-    border: 2px solid #23272A;
-    margin-top: 1px;
-}
-.discord-bubble {
-    flex: 1 1 0;
-    display: flex;
-    flex-direction: column;
-}
-.discord-header {
-    display: flex;
-    align-items: baseline;
-    gap: 7px;
-}
-.discord-username {
-    font-weight: 700;
-    color: #4EF2F7;
-    font-size: 16px;
-    margin-right: 4px;
-}
-.discord-you {
-    color: #b9bbbe;
-    font-size: 16px;
-    font-weight: 400;
-    margin-right: 4px;
-    font-style: normal;
-}
-.discord-timestamp {
-    color: #b9bbbe;
-    font-size: 13px;
-    font-weight: 400;
-    margin-top: 2px;
-}
-.discord-content {
-    color: #dcddde;
-    font-size: 15px;
-    margin-top: 2px;
-    word-break: break-word;
-}
-.discord-message.sent .discord-username {
-    color: #f7b24e;
-}
-.discord-message.sent {
-    outline: none !important;
-    box-shadow: none !important;
-}
-.chat-image {
-    max-width: 280px;
-    max-height: 220px;
-    border-radius: 10px;
-    margin: 5px 0;
-    display: block;
-    cursor: pointer;
-    transition: box-shadow .25s;
-}
-.chat-image:hover {
-    box-shadow: 0 4px 24px #2225;
-}
-.reply-context {
-    font-size:13px;
-    color:#4EF2F7;
-    background:#2a2d31;
-    border-left:3px solid #4EF2F7;
-    border-radius:4px;
-    padding:3px 8px;
-    margin-bottom:2px;
-    margin-right:2px;
-    margin-top:2px;
-    max-width: 350px;
-    overflow-x: auto;
-    white-space: pre-line;
-}
-.reply-context strong {
-    color: #2ec4b6;
-}
-button:focus,
-input:focus,
-textarea:focus,
-select:focus {
-    outline: none !important;
-    box-shadow: none !important;
-}
-
-/* --- Typing indicator styles --- */
-.typing-indicator-outer {
-    min-height: 24px;
-    margin-top: 0px;
-    margin-bottom: 3px;
-    margin-left: 60px;
-    color: #b9bbbe;
-    font-size: 15px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-top: 2px;
-    padding-bottom: 1px;
-    /* No extra padding above */
-}
-
-.typing-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    margin-right: 2px;
-    border-radius: 50%;
-    background: #b9bbbe;
-    opacity: 0.45;
-    animation: typing-bounce 1.2s infinite both;
-}
-.typing-dot:nth-child(1) { animation-delay: 0s; }
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes typing-bounce {
-    0%, 80%, 100% { opacity: 0.45; transform: translateY(0);}
-    40% { opacity: 1; transform: translateY(-3px);}
-}
-
-@media (max-width: 600px) {
-    .chat-container {
-        padding: 0 !important;
-    }
-    .message-box {
-        padding: 6px;
-    }
-    .typing-indicator-outer {
-        margin-left: 44px;
-        font-size: 14px;
-    }
+.discord-message:hover { background:rgba(255,255,255,0.04); }
+.discord-avatar { width:44px; height:44px; border-radius:50%; object-fit:cover; background:#2f3136; border:2px solid #23272A; margin-top:1px; flex-shrink:0; }
+.discord-bubble { flex:1 1 0; display:flex; flex-direction:column; min-width:0; }
+.discord-header { display:flex; align-items:baseline; gap:7px; flex-wrap:wrap; }
+.discord-username { font-weight:700; color:#4EF2F7; font-size:15px; }
+.discord-you { color:#b9bbbe; font-size:14px; font-style:normal; }
+.discord-timestamp { color:#b9bbbe; font-size:12px; }
+.discord-content { color:#dcddde; font-size:15px; margin-top:2px; word-break:break-word; }
+.discord-message.sent .discord-username { color:#f7b24e; }
+.chat-image { max-width:280px; max-height:220px; border-radius:10px; margin:5px 0; display:block; cursor:pointer; transition:box-shadow .25s; }
+.chat-image:hover { box-shadow:0 4px 24px #2225; }
+.reply-context { font-size:13px; color:#4EF2F7; background:#2a2d31; border-left:3px solid #4EF2F7; border-radius:4px; padding:3px 8px; margin-bottom:3px; max-width:350px; overflow-x:auto; white-space:pre-line; }
+.reply-context strong { color:#2ec4b6; }
+.mention-highlight-bubble { background:#f9e69b !important; border-left:4px solid #f8d363; box-shadow:0 0 8px #f8d36333; border-radius:8px; color:#23272a !important; font-weight:500; }
+.mention-highlight-bubble .discord-content, .mention-highlight-bubble .discord-timestamp, .mention-highlight-bubble .discord-username, .mention-highlight-bubble .discord-you { color:#23272a !important; }
+button:focus, input:focus, textarea:focus, select:focus { outline:none !important; box-shadow:none !important; }
+.typing-indicator-outer { min-height:22px; margin-bottom:2px; margin-left:56px; color:#b9bbbe; font-size:14px; display:flex; align-items:center; gap:6px; }
+.typing-dot { display:inline-block; width:6px; height:6px; margin-right:2px; border-radius:50%; background:#b9bbbe; opacity:0.45; animation:typing-bounce 1.2s infinite both; }
+.typing-dot:nth-child(1){animation-delay:0s}.typing-dot:nth-child(2){animation-delay:0.2s}.typing-dot:nth-child(3){animation-delay:0.4s}
+@keyframes typing-bounce { 0%,80%,100%{opacity:0.45;transform:translateY(0)} 40%{opacity:1;transform:translateY(-3px)} }
+/* Context menu */
+.ctx-item { padding:9px 16px; color:#dcddde; font-size:14px; cursor:pointer; display:flex; align-items:center; gap:10px; transition:background 0.1s; }
+.ctx-item:hover { background:#404249; }
+.ctx-danger { color:#ed4245 !important; }
+.ctx-danger:hover { background:rgba(237,66,69,0.12) !important; }
+.ctx-divider { border-top:1px solid #3f4147; margin:4px 0; }
+/* Mobile */
+@media (max-width:600px) {
+    .chat-container { padding:0 !important; }
+    .message-box { padding:6px; }
+    .typing-indicator-outer { margin-left:40px; font-size:13px; }
+    .discord-avatar { width:34px; height:34px; }
+    .discord-username,.discord-content { font-size:14px; }
+    .chat-image { max-width:190px; max-height:150px; }
+    .chat-header h3 { font-size:1rem; }
+    .input-row { padding:4px 2px; }
 }
 </style>
 
 <script>
-// Luxon for time zone formatting
 function setChatHeight() {
-    const navbar = document.getElementById('main-navbar');
-    if (navbar) {
-        const navbarHeight = navbar.offsetHeight;
-        document.documentElement.style.setProperty('--navbar-height', navbarHeight + 'px');
-    }
+    const nav = document.querySelector('.navbar-color');
+    if (nav) document.documentElement.style.setProperty('--navbar-height', nav.offsetHeight + 'px');
 }
 window.addEventListener('resize', setChatHeight);
 window.addEventListener('DOMContentLoaded', setChatHeight);
@@ -275,15 +133,94 @@ const newMessageIndicator = document.getElementById('newMessageIndicator');
 const currentUser = "{{ current_user.username }}";
 let renderedMessageIds = new Set();
 
-// --- REPLY TO MESSAGE LOGIC ---
-let replyToMessage = null;
+// --- CONTEXT MENU ---
+const ctxMenu = document.getElementById('ctxMenu');
+let ctxTargetMessage = null;
 let longPressTimer = null;
 
+function showCtxMenu(x, y, message) {
+    ctxTargetMessage = message;
+    document.getElementById('ctxDelete').style.display = (message.username === currentUser) ? 'flex' : 'none';
+    ctxMenu.style.display = 'block';
+    const safeX = Math.min(x, window.innerWidth - 200);
+    const safeY = Math.min(y, window.innerHeight - 170);
+    ctxMenu.style.left = Math.max(4, safeX) + 'px';
+    ctxMenu.style.top = Math.max(4, safeY) + 'px';
+}
+function hideCtxMenu() { ctxMenu.style.display = 'none'; ctxTargetMessage = null; }
+document.addEventListener('click', hideCtxMenu);
+document.addEventListener('scroll', hideCtxMenu, true);
+ctxMenu.addEventListener('click', e => e.stopPropagation());
+
+document.getElementById('ctxReply').addEventListener('click', () => {
+    if (ctxTargetMessage) showReplyBar(ctxTargetMessage);
+    hideCtxMenu();
+});
+document.getElementById('ctxCopy').addEventListener('click', () => {
+    if (ctxTargetMessage) {
+        const text = ctxTargetMessage.message || '[Image]';
+        navigator.clipboard ? navigator.clipboard.writeText(text) : (function(){
+            const el = document.createElement('textarea'); el.value = text;
+            document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+        })();
+    }
+    hideCtxMenu();
+});
+document.getElementById('ctxDelete').addEventListener('click', () => {
+    if (ctxTargetMessage && ctxTargetMessage.username === currentUser) {
+        if (confirm('Delete this message?')) {
+            fetch(`/delete_message/${key}/${ctxTargetMessage.id}`, { method:'POST', headers:{'Content-Type':'application/json'} })
+                .then(() => { renderedMessageIds.delete(ctxTargetMessage.id); rebuildMessages(); });
+        }
+    }
+    hideCtxMenu();
+});
+document.getElementById('ctxForward').addEventListener('click', () => {
+    if (ctxTargetMessage) openDmModal(ctxTargetMessage);
+    hideCtxMenu();
+});
+
+// Rebuild messages (used after delete)
+function rebuildMessages() {
+    messagesContainer.innerHTML = '';
+    renderedMessageIds = new Set();
+    fetchMessages(false);
+}
+
+// --- DM MODAL ---
+function openDmModal(message) {
+    const modal = document.getElementById('dmModal');
+    const sel = document.getElementById('dmUserSelect');
+    sel.innerHTML = '<option>Loading...</option>';
+    modal.style.display = 'flex';
+    fetch('/get_users').then(r => r.json()).then(data => {
+        sel.innerHTML = '';
+        (data.users || []).filter(u => u !== currentUser).forEach(u => {
+            const o = document.createElement('option'); o.value = u; o.textContent = u; sel.appendChild(o);
+        });
+        if (!sel.options.length) sel.innerHTML = '<option>No other users</option>';
+    });
+    document.getElementById('dmSendBtn').onclick = function() {
+        const toUser = sel.value;
+        if (!toUser) return;
+        fetch('/send_dm', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ to: toUser, message: message.message || '[Image]', image_url: message.image_url || null })
+        }).then(r => r.json()).then(d => {
+            if (d.success) { closeDmModal(); alert('Forwarded to ' + toUser + '!'); }
+        });
+    };
+}
+function closeDmModal() { document.getElementById('dmModal').style.display = 'none'; }
+
+// --- REPLY BAR ---
+let replyToMessage = null;
 function showReplyBar(message) {
     replyToMessage = message;
     document.getElementById('replyBar').style.display = 'block';
     document.getElementById('replyPreview').textContent =
-        `Replying to ${message.username}: "${(message.message ? message.message.slice(0, 64) : '[Image]')}${message.message && message.message.length > 64 ? '...' : ''}"`;
+        `Replying to ${message.username}: "${(message.message||'[Image]').slice(0,60)}${(message.message||'').length > 60 ? '...' : ''}"`;
+    document.getElementById('messageInput').focus();
 }
 function hideReplyBar() {
     replyToMessage = null;
@@ -292,425 +229,183 @@ function hideReplyBar() {
 }
 document.getElementById('cancelReplyBtn').addEventListener('click', hideReplyBar);
 
-// --- TYPING INDICATOR LOGIC ---
+// --- TYPING ---
 const typingIndicator = document.getElementById('typingIndicator');
-let typing = false;
-let typingTimeout = null;
-let lastTypedTime = 0;
-let typingFetchInterval = null;
-let typingUsers = [];
-
-// Send "typing" event to server (debounced)
+let typing = false, typingTimeout = null, typingUsers = [];
 function sendTypingEvent() {
-    if (!typing) {
-        typing = true;
-        fetch(`/typing/${key}`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ username: currentUser })
-        });
-    }
-    lastTypedTime = Date.now();
+    if (!typing) { typing = true; fetch(`/typing/${key}`, {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); }
     if (typingTimeout) clearTimeout(typingTimeout);
     typingTimeout = setTimeout(stopTyping, 2500);
 }
-
-// Stop typing event
-function stopTyping() {
-    typing = false;
-    fetch(`/typing_stop/${key}`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ username: currentUser })
-    });
-}
-
-// Poll server for typing users
+function stopTyping() { typing = false; fetch(`/typing_stop/${key}`, {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); }
 function fetchTypingUsers() {
-    fetch(`/typing_status/${key}`)
-        .then(response => response.json())
-        .then(data => {
-            typingUsers = data.typing || [];
-            updateTypingIndicator();
-        });
+    fetch(`/typing_status/${key}`).then(r=>r.json()).then(data=>{
+        typingUsers = data.typing||[];
+        const others = typingUsers.filter(u=>u!==currentUser);
+        if (!others.length) { typingIndicator.innerHTML=''; return; }
+        const names = others.length===1?`${others[0]} is typing`:others.length===2?`${others[0]} and ${others[1]} are typing`:`${others[0]} and ${others.length-1} more are typing`;
+        typingIndicator.innerHTML = `<span>${names}</span><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>`;
+    });
 }
-
-// --- Animated Typing Indicator (Discord style 3 dots) ---
-function renderTypingIndicator() {
-    const others = typingUsers.filter(u => u !== currentUser);
-    if (others.length === 0) {
-        typingIndicator.innerHTML = "";
-        typingIndicator.title = "";
-        return;
-    }
-    let names = "";
-    if (others.length === 1) {
-        names = `${others[0]} is typing`;
-    } else if (others.length === 2) {
-        names = `${others[0]} and ${others[1]} are typing`;
-    } else {
-        names = `${others[0]} and ${others.length - 1} more are typing`;
-    }
-    typingIndicator.innerHTML = `<span>${names}</span>
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>`;
-    typingIndicator.title = others.join(", ");
-}
-
-function updateTypingIndicator() {
-    renderTypingIndicator();
-}
-
-// Setup typing event listeners
 const messageInput = document.getElementById('messageInput');
-messageInput.addEventListener('input', function(e) {
-    if (messageInput.value) {
-        sendTypingEvent();
-    } else {
-        stopTyping();
-    }
-});
-messageInput.addEventListener('blur', function() {
-    stopTyping();
-});
+messageInput.addEventListener('input', () => messageInput.value ? sendTypingEvent() : stopTyping());
+messageInput.addEventListener('blur', stopTyping);
+setInterval(fetchTypingUsers, 1000);
+window.addEventListener('beforeunload', () => { stopTyping(); });
 
-// Poll for typing status every 1s
-typingFetchInterval = setInterval(fetchTypingUsers, 1000);
-
-// Clean up typing state when leaving page
-window.addEventListener('beforeunload', function() {
-    stopTyping();
-    clearInterval(typingFetchInterval);
-});
-
-// --- END TYPING INDICATOR LOGIC ---
-
-function getMessageId(message) {
-    return message.id || message._id || JSON.stringify([message.timestamp, message.username, message.message, message.image_url]);
+// --- MESSAGES ---
+function getMessageId(m) { return m.id || JSON.stringify([m.timestamp,m.username,m.message,m.image_url]); }
+function isAtBottom() { return messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 40; }
+function scrollToBottom() { messagesContainer.scrollTop = messagesContainer.scrollHeight; }
+function isMessageRecent(ts) { try { return (new Date()-new Date(ts))/1000 < 60; } catch{return false;} }
+function notifyUser(msg) {
+    if (!("Notification" in window)||Notification.permission!=="granted") return;
+    new Notification("New message from "+msg.username,{body:msg.message||"Sent an image",icon:"/static/favicon.ico"});
 }
 
-function isAtBottom() {
-    const threshold = 40;
-    return messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < threshold;
-}
-
-function scrollToBottom() {
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-function notifyUser(message) {
-    if (!("Notification" in window)) return;
-    if (Notification.permission === "granted") {
-        new Notification("New message from " + message.username, {
-            body: message.message || "Sent an image",
-            icon: "/static/favicon.ico"
-        });
-    }
-}
-
-// Returns true if the message is less than 60 seconds old (in UTC)
-function isMessageRecent(utcTimestamp) {
-    try {
-        const messageDate = new Date(utcTimestamp);
-        const nowUTC = new Date();
-        // Both in ms, so difference in seconds
-        const diffSeconds = (nowUTC - messageDate) / 1000;
-        return diffSeconds >= 0 && diffSeconds < 60;
-    } catch {
-        return false;
-    }
-}
-
-function appendNewMessages(messages, forceScrollBottom = false) {
+function appendNewMessages(messages, forceScrollBottom=false) {
     const atBottom = isAtBottom();
-    const previousScrollHeight = messagesContainer.scrollHeight;
+    const prevH = messagesContainer.scrollHeight;
     let appended = false;
-
     messages.forEach(message => {
-        // Ensure message has an id (for replies)
-        if (!message.id) {
-            message.id = getMessageId(message);
+        if (!message.id) message.id = getMessageId(message);
+        if (renderedMessageIds.has(message.id)) return;
+        renderedMessageIds.add(message.id);
+        appended = true;
+        const isSent = message.username === currentUser;
+        const profilePic = message.profile_pic ? `/static/profile_pics/${message.profile_pic}` : '/static/profile_pics/default.png';
+        const row = document.createElement('div');
+        row.classList.add('discord-message');
+        if (isSent) row.classList.add('sent');
+        row.dataset.msgId = message.id;
+
+        // Desktop right-click
+        row.addEventListener('contextmenu', e => { e.preventDefault(); showCtxMenu(e.clientX, e.clientY, message); });
+        // Mobile long-press
+        row.addEventListener('touchstart', e => {
+            longPressTimer = setTimeout(() => {
+                const t = e.touches[0];
+                showCtxMenu(t.clientX, t.clientY, message);
+            }, 500);
+        }, {passive:true});
+        row.addEventListener('touchend', () => { if(longPressTimer) clearTimeout(longPressTimer); });
+        row.addEventListener('touchmove', () => { if(longPressTimer) clearTimeout(longPressTimer); });
+
+        const avatar = document.createElement('img');
+        avatar.className='discord-avatar'; avatar.src=profilePic; avatar.alt='avatar';
+        avatar.onerror=()=>{ avatar.src='/static/profile_pics/default.png'; };
+
+        const bubble = document.createElement('div');
+        bubble.className='discord-bubble';
+        if (message.highlight) bubble.classList.add('mention-highlight-bubble');
+
+        const header = document.createElement('div');
+        header.className='discord-header';
+        const uname = document.createElement('span');
+        uname.className='discord-username'; uname.textContent=message.username;
+        header.appendChild(uname);
+        if (isSent) {
+            const you = document.createElement('span');
+            you.className='discord-you'; you.textContent='(You)';
+            header.appendChild(you);
         }
-        const msgId = message.id;
-        if (!renderedMessageIds.has(msgId)) {
-            renderedMessageIds.add(msgId);
-            appended = true;
+        const ts = document.createElement('span');
+        ts.className='discord-timestamp'; ts.textContent=formatSydneyTime(message.timestamp);
+        header.appendChild(ts);
 
-            const isSent = message.username === currentUser;
-            const profilePic = message.profile_pic ? `/static/profile_pics/${message.profile_pic}` : '/static/profile_pics/default.png';
-
-            // --- Discord style message row ---
-            const messageRow = document.createElement('div');
-            messageRow.classList.add('discord-message');
-            if (isSent) messageRow.classList.add('sent');
-
-            // For reply actions
-            messageRow.addEventListener('contextmenu', function(e) {
-                e.preventDefault();
-                showReplyBar(message);
-            });
-            // Touch long-press
-            messageRow.addEventListener('touchstart', function(e) {
-                longPressTimer = setTimeout(() => {
-                    showReplyBar(message);
-                }, 450);
-            });
-            messageRow.addEventListener('touchend', function(e) {
-                if (longPressTimer) clearTimeout(longPressTimer);
-            });
-            messageRow.addEventListener('touchmove', function(e) {
-                if (longPressTimer) clearTimeout(longPressTimer);
-            });
-
-            // Avatar
-            const avatar = document.createElement('img');
-            avatar.className = "discord-avatar";
-            avatar.src = profilePic;
-            avatar.alt = "avatar";
-            avatar.onerror = function(){ this.onerror=null; this.src='/static/profile_pics/default.png'; }
-
-            // Message content
-            const bubble = document.createElement('div');
-            bubble.className = "discord-bubble";
-            if (message.highlight) {
-                bubble.classList.add('mention-highlight-bubble');
-            }
-            // Header: Username, (You), Timestamp
-            const header = document.createElement('div');
-            header.className = "discord-header";
-            const username = document.createElement('span');
-            username.className = "discord-username";
-            username.textContent = message.username;
-            header.appendChild(username);
-
-            if (isSent) {
-                const youSpan = document.createElement('span');
-                youSpan.className = "discord-you";
-                youSpan.textContent = "(You)";
-                header.appendChild(youSpan);
-            }
-
-            const timestamp = document.createElement('span');
-            timestamp.className = "discord-timestamp";
-            timestamp.textContent = formatSydneyTime(message.timestamp);
-            header.appendChild(timestamp);
-
-            // Content
-            const content = document.createElement('div');
-            content.className = "discord-content";
-            // Show reply context if present
-            if (message.reply_to) {
-                const replyDiv = document.createElement('div');
-                replyDiv.className = "reply-context";
-                replyDiv.innerHTML = `<strong>${message.reply_to.username}</strong>: <span style="color:#b9bbbe">${message.reply_to.preview ? message.reply_to.preview : '[Image]'}</span>`;
-                content.appendChild(replyDiv);
-            }
-            if (message.image_url) {
-                content.innerHTML += `<img src="${message.image_url}" class="chat-image" alt="sent image" onclick="showFullscreenImage('${message.image_url.replace(/'/g, "\\'")}')">`;
-            }
-            if (message.message) {
-                if (message.image_url) content.innerHTML += "<br>";
-                content.innerHTML += message.message;
-            }
-
-            bubble.appendChild(header);
-            bubble.appendChild(content);
-
-            messageRow.appendChild(avatar);
-            messageRow.appendChild(bubble);
-
-            messagesContainer.appendChild(messageRow);
-
-            // Notifications: only for new messages from others, if enabled, and if message is < 1 min old
-            // Notifications: only for new messages from others, if enabled, or if you are mentioned, and if message is < 1 min old
-const isMentioned = message.mentions && (
-    message.mentions.includes("everyone") ||
-    message.mentions.includes(currentUser)
-);
-
-        if (
-            message.username !== currentUser &&
-            isMessageRecent(message.timestamp) &&
-            (
-                isMentioned ||
-                document.cookie.includes("notifications_enabled=1")
-            )
-        ) {
-            if (Notification.permission !== "denied") {
-                Notification.requestPermission().then(function (permission) {
-                    if (permission === "granted") {
-                        notifyUser(message);
-                    }
-                });
-            } else if (Notification.permission === "granted") {
-                notifyUser(message);
-            }
+        const content = document.createElement('div');
+        content.className='discord-content';
+        if (message.reply_to) {
+            const rd = document.createElement('div');
+            rd.className='reply-context';
+            rd.innerHTML=`<strong>${message.reply_to.username}</strong>: <span style="color:#b9bbbe">${message.reply_to.preview||'[Image]'}</span>`;
+            content.appendChild(rd);
         }
+        if (message.image_url) {
+            const img = document.createElement('img');
+            img.className='chat-image'; img.src=message.image_url; img.alt='sent image';
+            img.onclick=()=>showFullscreenImage(message.image_url);
+            content.appendChild(img);
+        }
+        if (message.message) {
+            if (message.image_url) content.appendChild(document.createElement('br'));
+            const txt = document.createElement('span');
+            txt.textContent = message.message;
+            content.appendChild(txt);
+        }
+        bubble.appendChild(header); bubble.appendChild(content);
+        row.appendChild(avatar); row.appendChild(bubble);
+        messagesContainer.appendChild(row);
+
+        const isMentioned = message.mentions && (message.mentions.includes('everyone')||message.mentions.includes(currentUser));
+        if (message.username!==currentUser && isMessageRecent(message.timestamp) && (isMentioned||document.cookie.includes('notifications_enabled=1'))) {
+            Notification.permission==='granted' ? notifyUser(message) :
+            Notification.permission!=='denied' && Notification.requestPermission().then(p=>p==='granted'&&notifyUser(message));
         }
     });
-
-    if (appended && !atBottom && !forceScrollBottom) {
-        newMessageIndicator.style.display = 'block';
-    }
-
-    if (forceScrollBottom || (atBottom && appended)) {
-        scrollToBottom();
-        newMessageIndicator.style.display = 'none';
-    } else if (appended) {
-        const newScrollHeight = messagesContainer.scrollHeight;
-        messagesContainer.scrollTop += (newScrollHeight - previousScrollHeight);
-    }
+    if (appended && !atBottom && !forceScrollBottom) newMessageIndicator.style.display='block';
+    if (forceScrollBottom||(atBottom&&appended)) { scrollToBottom(); newMessageIndicator.style.display='none'; }
+    else if (appended) { messagesContainer.scrollTop += (messagesContainer.scrollHeight - prevH); }
 }
 
-// Use Luxon to handle Australia/Sydney time zone (AEDT/AEST with DST)
 function formatSydneyTime(utcTimestamp) {
     const DateTime = luxon.DateTime;
-    const dtSydney = DateTime.fromISO(utcTimestamp, { zone: 'utc' }).setZone('Australia/Sydney');
-    const nowSydney = DateTime.now().setZone('Australia/Sydney');
-    let timeString = dtSydney.toFormat('hh:mm:ss a');
-    if (dtSydney.hasSame(nowSydney, 'day')) {
-        return `Today at ${timeString} ${dtSydney.offsetNameShort}`;
-    }
-    return `${dtSydney.toFormat('yyyy-MM-dd')} ${timeString} ${dtSydney.offsetNameShort}`;
+    const dt = DateTime.fromISO(utcTimestamp,{zone:'utc'}).setZone('Australia/Sydney');
+    const now = DateTime.now().setZone('Australia/Sydney');
+    const t = dt.toFormat('hh:mm:ss a');
+    return dt.hasSame(now,'day') ? `Today at ${t} ${dt.offsetNameShort}` : `${dt.toFormat('yyyy-MM-dd')} ${t} ${dt.offsetNameShort}`;
 }
 
-function clearMessages() {
-    messagesContainer.innerHTML = '';
-    renderedMessageIds = new Set();
+function fetchMessages(forceScrollBottom=false) {
+    fetch(`/messages/${key}`).then(r=>r.json()).then(data=>{ if(data.messages) appendNewMessages(data.messages,forceScrollBottom); });
 }
+messagesContainer.innerHTML=''; fetchMessages(true); setInterval(fetchMessages, 3000);
 
-function fetchMessages(forceScrollBottom = false) {
-    fetch(`/messages/${key}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.messages) {
-                appendNewMessages(data.messages, forceScrollBottom);
-            }
-        });
-}
-
-clearMessages();
-setInterval(fetchMessages, 3000);
-
-document.getElementById('sendMessageForm').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const messageInput = document.getElementById('messageInput');
-    if (messageInput.value.trim() === '') return;
-    const bodyData = { message: messageInput.value };
-    if (replyToMessage && replyToMessage.id) {
-        bodyData.reply_to = {
-            id: replyToMessage.id,
-            username: replyToMessage.username,
-            preview: replyToMessage.message ? replyToMessage.message.slice(0, 64) : '[Image]'
-        };
-    }
-    try {
-        const response = await fetch(`/chat_room/${key}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(bodyData)
-        });
-
-        if (response.ok) {
-            messageInput.value = '';
-            hideReplyBar();
-            fetchMessages(true);
-        } else {
-            const data = await response.json();
-            console.error("Error sending message:", data.error || response.status);
-        }
-    } catch (error) {
-        console.error("Fetch error:", error);
-    }
+document.getElementById('sendMessageForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const inp = document.getElementById('messageInput');
+    if (!inp.value.trim()) return;
+    const body = {message: inp.value};
+    if (replyToMessage && replyToMessage.id) body.reply_to = {id:replyToMessage.id, username:replyToMessage.username, preview:(replyToMessage.message||'[Image]').slice(0,64)};
+    const r = await fetch(`/chat_room/${key}`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if (r.ok) { inp.value=''; hideReplyBar(); stopTyping(); fetchMessages(true); }
 });
 
 function uploadImage(event, groupCode) {
     const file = event.target.files[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append('image', file);
-
-    fetch(`/IMAGES/${groupCode}/`, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
+    const fd = new FormData(); fd.append('image', file);
+    fetch(`/IMAGES/${groupCode}/`, {method:'POST',body:fd}).then(r=>r.json()).then(data=>{
         if (data && data.image_url) {
-            fetch(`/chat_room/${groupCode}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: '',
-                    image_url: data.image_url,
-                    ...(replyToMessage && replyToMessage.id ? {
-                        reply_to: {
-                            id: replyToMessage.id,
-                            username: replyToMessage.username,
-                            preview: replyToMessage.message ? replyToMessage.message.slice(0, 64) : '[Image]'
-                        }
-                    } : {})
-                })
-            }).then(() => {
-                hideReplyBar();
-                fetchMessages(true);
-            });
-        } else {
-            alert('Photo upload failed.');
-        }
-    })
-    .catch(error => {
-        alert('Photo upload failed.');
-    });
-    event.target.value = "";
+            const body = {message:'', image_url:data.image_url};
+            if (replyToMessage&&replyToMessage.id) body.reply_to={id:replyToMessage.id, username:replyToMessage.username, preview:(replyToMessage.message||'[Image]').slice(0,64)};
+            fetch(`/chat_room/${groupCode}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+                .then(()=>{ hideReplyBar(); fetchMessages(true); });
+        } else alert('Photo upload failed.');
+    }).catch(()=>alert('Photo upload failed.'));
+    event.target.value='';
 }
 
-newMessageIndicator.addEventListener('click', function() {
-    scrollToBottom();
-    this.style.display = 'none';
-});
-
-messagesContainer.addEventListener('scroll', function() {
-    if (isAtBottom()) {
-        newMessageIndicator.style.display = 'none';
-    }
-});
+newMessageIndicator.addEventListener('click', function(){ scrollToBottom(); this.style.display='none'; });
+messagesContainer.addEventListener('scroll', ()=>{ if(isAtBottom()) newMessageIndicator.style.display='none'; });
 
 function showFullscreenImage(src) {
-    const modal = document.getElementById('fullscreenImageModal');
-    const img = document.getElementById('fullscreenImage');
-    img.src = src;
-    modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+    document.getElementById('fullscreenImage').src=src;
+    document.getElementById('fullscreenImageModal').style.display='flex';
+    document.body.style.overflow='hidden';
 }
 function closeFullscreenImage() {
-    document.getElementById('fullscreenImageModal').style.display = 'none';
-    document.body.style.overflow = '';
+    document.getElementById('fullscreenImageModal').style.display='none';
+    document.body.style.overflow='';
 }
-document.getElementById('fullscreenImageModal').addEventListener('click', function(e) {
-    if (e.target === this) closeFullscreenImage();
-});
+document.getElementById('fullscreenImageModal').addEventListener('click', function(e){ if(e.target===this) closeFullscreenImage(); });
 
-function checkTimeout() {
-    fetch("/check_timeout")
-        .then(response => response.json())
-        .then(data => {
-            if (data.timed_out) {
-                window.location.href = "/chat";
-            }
-        })
-        .catch(error => console.error("Error checking timeout:", error));
-}
+setInterval(()=>{
+    fetch('/check_timeout').then(r=>r.json()).then(d=>{ if(d.timed_out) window.location.href='/chat'; }).catch(()=>{});
+}, 3000);
 
-setInterval(checkTimeout, 3000);
-
-document.addEventListener('DOMContentLoaded', function () {
-    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-        Notification.requestPermission();
-    }
+document.addEventListener('DOMContentLoaded', ()=>{
+    if ("Notification" in window && Notification.permission!=="granted" && Notification.permission!=="denied") Notification.requestPermission();
 });
 </script>
 {% endblock %}

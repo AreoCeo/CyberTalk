@@ -6,57 +6,98 @@
 
 {% block main %}
 <style>
-    /* Subtle fade-in animation for the main elements */
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
     }
-
-    /* Apply fade-in animation to the container */
-    .fadeIn {
-        animation: fadeIn 0.5s ease-in-out;
-    }
-
-    /* Button hover effect */
-    .btn {
-        transition: background-color 0.3s, transform 0.2s;
-    }
-
-    .btn:hover {
-        background-color: #0056b3; /* Darker shade on hover */
-        transform: scale(1.05);
-    }
-
-    /* Card styles */
+    .fadeIn { animation: fadeIn 0.5s ease-in-out; }
+    .btn { transition: background-color 0.3s, transform 0.2s; }
+    .btn:hover { transform: scale(1.05); }
     .card {
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         border-radius: 10px;
-        padding: 20px;
-        background: white; /* Light mode background */
+        padding: 28px 24px;
+        background: white;
+        max-width: 420px;
+        width: 100%;
     }
+    body[data-theme='dark'] .card { background: #2b2d31; color: white; }
+    body[data-theme='yellow'] .card { background: #fff8c0; }
 
-    /* Dark mode styles */
-    body[data-theme='dark'] .card {
-        background: #343a40; /* Dark grey background */
-        color: white; /* White text for contrast */
+    .key-display {
+        background: #23272a;
+        color: #5865F2;
+        border-radius: 8px;
+        padding: 14px 20px;
+        font-size: 2rem;
+        font-weight: 700;
+        letter-spacing: 4px;
+        margin: 12px 0;
+        word-break: break-all;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+    }
+    .copy-btn {
+        background: transparent;
+        border: 1px solid #3f4147;
+        border-radius: 6px;
+        color: #b9bbbe;
+        font-size: 16px;
+        padding: 4px 10px;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .copy-btn:hover { background: #404249; color: #fff; }
+    .copied-toast {
+        display: none;
+        font-size: 12px;
+        color: #43b581;
+        margin-top: 4px;
     }
 </style>
 
 <div class="d-flex justify-content-center align-items-center" style="min-height: 100vh;">
     <div class="card text-center fadeIn">
-        <h1>Generate a Group Chat Key</h1>
+        <h1 class="mb-1" style="font-size:1.5rem;">Generate a Group Chat Key</h1>
+        <p class="text-muted mb-3" style="font-size:13px;">Share this key with others to let them join your group.</p>
+
         <form action="/generate" method="post">
-            <div>
-                <button class="btn btn-primary" type="submit">Generate Key</button>
-            </div>
+            <button class="btn btn-primary w-100 mb-3" type="submit">
+                <i class="bi bi-key"></i> Generate New Key
+            </button>
         </form>
+
         {% if key %}
-            <h2 class="mt-4">Your unique key is: <strong>{{ key }}</strong></h2>
-            <p>You can now share this key with others to join your group chat.</p>
+            <div class="key-display">
+                <span id="keyText">{{ key }}</span>
+                <button class="copy-btn" onclick="copyKey()" title="Copy key">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+            </div>
+            <div class="copied-toast" id="copiedToast">✓ Copied!</div>
+            <p class="text-muted mb-3" style="font-size:13px;">Your group has been created. You can join it now or share the key.</p>
+
+            <a href="/chat_room/{{ key }}" class="btn btn-success w-100 mb-2" style="font-size:1rem;">
+                <i class="bi bi-box-arrow-in-right"></i> Join This Group Now
+            </a>
         {% endif %}
-        <div class="mt-4">
-            <a class="btn btn-secondary" href="/">Back to Home</a>
-        </div>
+
+        <a class="btn btn-secondary w-100 mt-1" href="/">Back to Home</a>
     </div>
 </div>
+
+<script>
+function copyKey() {
+    const keyText = document.getElementById('keyText').textContent;
+    navigator.clipboard ? navigator.clipboard.writeText(keyText) : (function(){
+        const el = document.createElement('textarea'); el.value = keyText;
+        document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+    })();
+    const toast = document.getElementById('copiedToast');
+    toast.style.display = 'block';
+    setTimeout(() => toast.style.display = 'none', 2000);
+}
+</script>
 {% endblock %}

@@ -192,7 +192,7 @@ def post_message(key):
             "id": msg_id,
             "username": current_user.username,
             "emoji": current_user.emoji,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             "profile_pic": profile_pic,
             "highlight": highlight,
             "mentions": mentioned_users,
@@ -392,7 +392,7 @@ def send_dm():
         "id": msg_id,
         "username": current_user.username,
         "emoji": current_user.emoji,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "profile_pic": profile_pic,
     }
     if message:

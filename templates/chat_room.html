@@ -8,13 +8,13 @@
         <a href="/dm" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chat-dots"></i> DMs</a>
     </div>
     <div class="chat-window" style="position: relative; flex: 1 1 0; display: flex; flex-direction: column; min-height: 0;">
-        <div id="replyBar" style="display:none; background:#2a2d31; color:#fff; border-radius:6px 6px 0 0; padding:8px 12px 8px 24px; margin-bottom:-2px; position:relative; border-left: 3px solid #5865F2;">
+        <div id="replyBar" style="display:none; background:#2a2d31; color:#fff; border-radius:6px 6px 0 0; padding:8px 12px 8px 24px; margin-bottom:-2px; position:relative; border-left: 3px solid #5865F2; flex-shrink: 0;">
             <span id="replyPreview" style="font-size:13px;"></span>
             <button id="cancelReplyBtn" style="position:absolute;right:12px;top:8px;background:transparent;border:none;color:#aaa;font-size:18px;">&times;</button>
         </div>
         <div id="messages" class="message-box border rounded p-3"></div>
         <button id="newMessageIndicator" title="New messages below"
-            style="display:none; position: absolute; right: -52px; bottom: 24px; z-index: 10; background: transparent; border: none; box-shadow: none;">
+            style="display:none; position: absolute; right: -52px; bottom: 80px; z-index: 10; background: transparent; border: none; box-shadow: none;">
             <span class="fs-2 text-danger"><i class="bi bi-exclamation-circle-fill"></i></span>
         </button>
         <div class="d-flex align-items-center input-row">
@@ -38,7 +38,6 @@
     </div>
 </div>
 
-<!-- Right-click / Long-press Context Menu -->
 <div id="ctxMenu" style="display:none;position:fixed;z-index:99999;background:#2b2d31;border:1px solid #3f4147;border-radius:8px;padding:6px 0;min-width:185px;box-shadow:0 8px 32px #0009;">
     <div class="ctx-item" id="ctxReply"><i class="bi bi-reply-fill"></i> Reply</div>
     <div class="ctx-item" id="ctxCopy"><i class="bi bi-clipboard"></i> Copy Text</div>
@@ -47,7 +46,6 @@
     <div class="ctx-item ctx-danger" id="ctxDelete" style="display:none;"><i class="bi bi-trash-fill"></i> Delete Message</div>
 </div>
 
-<!-- Forward to DM Modal -->
 <div id="dmModal" style="display:none;position:fixed;z-index:100000;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
     <div style="background:#2b2d31;border-radius:12px;padding:28px 24px;min-width:300px;max-width:400px;width:90%;box-shadow:0 8px 40px #0009;">
         <h5 style="color:#fff;margin-bottom:16px;"><i class="bi bi-send-fill"></i> Forward to DM</h5>
@@ -62,9 +60,10 @@
 
 <style>
 html, body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; }
-.chat-header { padding:0.5rem 1rem; }
+.chat-header { padding:0.5rem 1rem; flex-shrink: 0; }
 .chat-container {
-    height: calc(100vh - var(--navbar-height, 56px) - 12px);
+    /* CHANGED: Use 100dvh for mobile support */
+    height: calc(100dvh - var(--navbar-height, 56px) - 12px);
     display:flex; flex-direction:column; padding:0; margin:0; max-width:100vw;
     padding-left:10px; padding-right:10px;
 }
@@ -74,7 +73,14 @@ html, body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; }
     padding:15px; border-radius:10px; background:#23272a;
     display:flex; flex-direction:column; gap:10px;
 }
-.input-row { margin-top:0 !important; padding:6px 0 2px 0; gap:8px; }
+/* Ensure input row doesn't shrink on mobile keyboards */
+.input-row { 
+    margin-top:0 !important; 
+    padding:6px 0 2px 0; 
+    gap:8px; 
+    flex-shrink: 0; 
+    padding-bottom: env(safe-area-inset-bottom);
+}
 .discord-message {
     display:flex; align-items:flex-start; gap:10px; padding:4px 8px 4px 4px;
     cursor:default; user-select:text; position:relative; border-radius:6px;
@@ -96,7 +102,7 @@ html, body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; }
 .mention-highlight-bubble { background:#f9e69b !important; border-left:4px solid #f8d363; box-shadow:0 0 8px #f8d36333; border-radius:8px; color:#23272a !important; font-weight:500; }
 .mention-highlight-bubble .discord-content, .mention-highlight-bubble .discord-timestamp, .mention-highlight-bubble .discord-username, .mention-highlight-bubble .discord-you { color:#23272a !important; }
 button:focus, input:focus, textarea:focus, select:focus { outline:none !important; box-shadow:none !important; }
-.typing-indicator-outer { min-height:22px; margin-bottom:2px; margin-left:56px; color:#b9bbbe; font-size:14px; display:flex; align-items:center; gap:6px; }
+.typing-indicator-outer { min-height:22px; margin-bottom:2px; margin-left:56px; color:#b9bbbe; font-size:14px; display:flex; align-items:center; gap:6px; flex-shrink: 0; }
 .typing-dot { display:inline-block; width:6px; height:6px; margin-right:2px; border-radius:50%; background:#b9bbbe; opacity:0.45; animation:typing-bounce 1.2s infinite both; }
 .typing-dot:nth-child(1){animation-delay:0s}.typing-dot:nth-child(2){animation-delay:0.2s}.typing-dot:nth-child(3){animation-delay:0.4s}
 @keyframes typing-bounce { 0%,80%,100%{opacity:0.45;transform:translateY(0)} 40%{opacity:1;transform:translateY(-3px)} }

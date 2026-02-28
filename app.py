@@ -20,7 +20,10 @@ import shutil
 from PIL import Image
 from flask_login import logout_user # Add this to your imports
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user
+import warnings
 
+# Add this at the top of your app.py to ignore the Flask-Login warning
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="flask_login")
 SETTINGS_DIR = "settings"
 os.makedirs(SETTINGS_DIR, exist_ok=True)
 os.makedirs(os.path.join("static", "profile_pics"), exist_ok=True)
@@ -192,7 +195,7 @@ def post_message(key):
             "id": msg_id,
             "username": current_user.username,
             "emoji": current_user.emoji,
-            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "profile_pic": profile_pic,
             "highlight": highlight,
             "mentions": mentioned_users,
@@ -392,7 +395,7 @@ def send_dm():
         "id": msg_id,
         "username": current_user.username,
         "emoji": current_user.emoji,
-        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "profile_pic": profile_pic,
     }
     if message:
